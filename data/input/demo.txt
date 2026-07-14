@@ -1,0 +1,5 @@
+Private Doc Agent is a local-first assistant.
+
+This project starts with basic document loading and keyword search.
+
+Later, it will include local LLM integration, RAG, tools, MCP and multi-agent validation.

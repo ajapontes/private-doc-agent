@@ -6,32 +6,38 @@ The project is being built incrementally, starting from deterministic document l
 
 ## Current Version
 
-v0.2.0
+v0.2.1
 
 ## What it does now
 
 Private Doc Agent currently provides a FastAPI backend that can read local `.txt` and `.md` documents, list available files, retrieve document content, search keywords across documents, and summarize documents using a locally running LLM through Ollama.
 
-The current version introduces the first AI-powered capability: local document summarization.
+The current version includes the first AI-powered capability: local document summarization.
 
 The document content is processed locally and sent to a local model served by Ollama. This keeps the project aligned with a local-first and privacy-oriented architecture.
 
+This version also adds centralized application logging to improve traceability and debugging across the API and internal services.
+
 ## Current Features
 
-* FastAPI backend.
-* Health check endpoint.
-* Local document listing.
-* Support for `.txt` and `.md` files.
-* Document content retrieval.
-* Simple keyword search across supported documents.
-* Local LLM integration through Ollama.
-* Configurable model using environment variables.
-* Prompt template for document summarization.
-* Document summarization endpoint.
+- FastAPI backend.
+- Health check endpoint.
+- Local document listing.
+- Support for `.txt` and `.md` files.
+- Document content retrieval.
+- Simple keyword search across supported documents.
+- Local LLM integration through Ollama.
+- Configurable model using environment variables.
+- Prompt template for document summarization.
+- Document summarization endpoint.
+- Centralized application logging.
+- Console and rotating file logging.
+- Request-level log separator for better traceability.
+- Privacy-aware logs that avoid storing document content, full prompts or generated responses.
 
 ## AI Layer Introduced
 
-In version `v0.2.0`, the project introduces a local LLM-based generation layer.
+In version `v0.2.0`, the project introduced a local LLM-based generation layer.
 
 Current AI flow:
 
@@ -57,6 +63,7 @@ private-doc-agent/
     __init__.py
     main.py
     config.py
+    logging_config.py
     prompts/
       summarize_prompt.txt
     services/
@@ -72,6 +79,8 @@ private-doc-agent/
     processed/
   docs/
     roadmap.md
+  logs/
+    app.log
   tests/
   README.md
   requirements.txt
@@ -79,15 +88,17 @@ private-doc-agent/
   .gitignore
 ```
 
+Note: `logs/app.log` is generated locally and should not be committed to GitHub.
+
 ## Requirements
 
-* Python 3.11+
-* FastAPI
-* Uvicorn
-* Pydantic
-* python-dotenv
-* requests
-* Ollama installed and running locally
+- Python 3.11+
+- FastAPI
+- Uvicorn
+- Pydantic
+- python-dotenv
+- requests
+- Ollama installed and running locally
 
 ## Setup
 
@@ -175,6 +186,68 @@ Open the interactive API documentation:
 http://localhost:8000/docs
 ```
 
+## Application Logging
+
+Private Doc Agent includes centralized application logging to improve traceability and debugging during local development.
+
+Logs are written to:
+
+```text
+logs/app.log
+```
+
+The application also writes logs to the console while running with Uvicorn.
+
+### Logging capabilities
+
+- Logs API request flow.
+- Logs document listing and document reading events.
+- Logs keyword search execution.
+- Logs local LLM calls through Ollama.
+- Logs document summarization flow.
+- Adds a visual separator between API executions.
+- Uses rotating log files to avoid unlimited log growth.
+
+### Privacy-aware logging
+
+The application intentionally avoids logging sensitive content.
+
+The logs may include:
+
+```text
+- endpoint execution
+- filename
+- model name
+- document size
+- prompt length
+- response length
+- number of search matches
+- error messages
+```
+
+The logs should not include:
+
+```text
+- full document content
+- full prompt content
+- full generated summary
+- private document data
+```
+
+### View logs
+
+To view the latest log entries:
+
+```powershell
+Get-Content .\logs\app.log -Tail 80
+```
+
+To watch logs in real time:
+
+```powershell
+Get-Content .\logs\app.log -Wait
+```
+
 ## API Endpoints
 
 ### Health Check
@@ -189,7 +262,7 @@ Expected response:
 {
   "status": "ok",
   "app": "private-doc-agent",
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
 ```
 
@@ -265,7 +338,7 @@ Expected response structure:
   "filename": "demo.md",
   "summary": "The document explains...",
   "model": "qwen3.5:4b",
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
 ```
 
@@ -301,12 +374,12 @@ Initial version focused on deterministic document handling without AI.
 
 Features introduced:
 
-* FastAPI application structure.
-* Health check endpoint.
-* Local document discovery.
-* Support for `.txt` and `.md` files.
-* Document content retrieval.
-* Case-insensitive keyword search across local documents.
+- FastAPI application structure.
+- Health check endpoint.
+- Local document discovery.
+- Support for `.txt` and `.md` files.
+- Document content retrieval.
+- Case-insensitive keyword search across local documents.
 
 AI status:
 
@@ -317,17 +390,17 @@ This version establishes the document ingestion and search foundation.
 
 ### v0.2.0 - Local LLM Document Summarization
 
-This version introduces the first AI-powered capability.
+This version introduced the first AI-powered capability.
 
 Features introduced:
 
-* Local LLM integration through Ollama.
-* Configurable Ollama base URL and model through `.env`.
-* Local LLM client service.
-* Prompt template for summarization.
-* Document summarization service.
-* `POST /summarize` endpoint.
-* Improved separation between document loading, search, LLM communication, and summarization logic.
+- Local LLM integration through Ollama.
+- Configurable Ollama base URL and model through `.env`.
+- Local LLM client service.
+- Prompt template for summarization.
+- Document summarization service.
+- `POST /summarize` endpoint.
+- Improved separation between document loading, search, LLM communication, and summarization logic.
 
 AI status:
 
@@ -340,76 +413,97 @@ Local document content
 
 This version is still not RAG. The full document is passed as context to the local model.
 
+### v0.2.1 - Application Logging
+
+This version adds centralized application logging and traceability across the project.
+
+Features introduced:
+
+- Centralized logging configuration.
+- Console logging.
+- Rotating file logging under `logs/app.log`.
+- Request-level visual separator.
+- Logging across API endpoints and services.
+- Traceability for document loading, keyword search, local LLM calls and summarization.
+- Privacy-aware logging that avoids storing full document content, prompts or generated summaries.
+
+AI status:
+
+```text
+No new AI capability introduced.
+This version improves observability and debugging for the local LLM summarization flow.
+```
+
 ## Roadmap
 
 ### v0.3.0 - Basic RAG
 
 Planned capabilities:
 
-* Split documents into chunks.
-* Generate local embeddings.
-* Store vectors in ChromaDB.
-* Retrieve relevant chunks based on a user question.
-* Answer questions using retrieved context.
-* Return sources used to generate the answer.
+- Split documents into chunks.
+- Generate local embeddings.
+- Store vectors in ChromaDB.
+- Retrieve relevant chunks based on a user question.
+- Answer questions using retrieved context.
+- Return sources used to generate the answer.
 
 ### v0.4.0 - Tool-Based Agent
 
 Planned capabilities:
 
-* Add document tools such as search, summarize, and ask.
-* Create a simple agent router.
-* Allow the system to decide which tool to use based on user intent.
+- Add document tools such as search, summarize, and ask.
+- Create a simple agent router.
+- Allow the system to decide which tool to use based on user intent.
 
 ### v0.5.0 - Auditor Agent
 
 Planned capabilities:
 
-* Add a second validation layer.
-* Review answers for unsupported claims.
-* Check whether the response is grounded in document evidence.
-* Add confidence levels.
+- Add a second validation layer.
+- Review answers for unsupported claims.
+- Check whether the response is grounded in document evidence.
+- Add confidence levels.
 
 ### v0.6.0 - MCP Server
 
 Planned capabilities:
 
-* Expose document tools through MCP.
-* Allow external clients or agents to call document-related tools using a standard protocol.
+- Expose document tools through MCP.
+- Allow external clients or agents to call document-related tools using a standard protocol.
 
 ## Design Principles
 
-* Local-first execution.
-* Privacy-oriented architecture.
-* Incremental learning by layers.
-* Clear separation of responsibilities.
-* Documented code.
-* No external LLM dependency for private document processing.
-* Build deterministic capabilities before adding agentic behavior.
+- Local-first execution.
+- Privacy-oriented architecture.
+- Incremental learning by layers.
+- Clear separation of responsibilities.
+- Documented code.
+- No external LLM dependency for private document processing.
+- Build deterministic capabilities before adding agentic behavior.
 
 ## Current Limitations
 
-* Only `.txt` and `.md` files are supported.
-* Summarization sends the full document content to the local model.
-* Large documents may exceed the model context window.
-* No chunking yet.
-* No embeddings yet.
-* No vector database yet.
-* No RAG yet.
-* No agent or MCP support yet.
-* No frontend yet.
+- Only `.txt` and `.md` files are supported.
+- Summarization sends the full document content to the local model.
+- Large documents may exceed the model context window.
+- No chunking yet.
+- No embeddings yet.
+- No vector database yet.
+- No RAG yet.
+- No agent or MCP support yet.
+- No frontend yet.
 
-## Suggested Commit for v0.2.0
+## Suggested Commit for v0.2.1
 
 ```bash
 git add .
-git commit -m "feat: add local LLM document summarization"
+git commit -m "feat: add local LLM summarization with logging"
 git push origin feature/local-llm-summarization
 ```
 
 After merging into `main`, the suggested tag is:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```

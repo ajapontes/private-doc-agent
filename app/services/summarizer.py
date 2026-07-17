@@ -8,13 +8,22 @@ It connects three parts of the application:
 1. The document loader, which reads local .txt and .md files.
 2. The prompt template, which defines how the model should summarize.
 3. The local LLM client, which sends the prompt to Ollama.
+
+Logging strategy:
+- Logs summarization flow using operational metadata.
+- Logs filename, document length, prompt length and summary length.
+- Does not log full document content, full prompt or generated summary
+  to avoid exposing private information.
 """
 
-from pathlib import Path
+import logging
 
 from app.config import BASE_DIR
 from app.services.document_loader import read_document
 from app.services.llm_client import generate_text
+
+
+logger = logging.getLogger(__name__)
 
 
 PROMPT_PATH = BASE_DIR / "app" / "prompts" / "summarize_prompt.txt"
@@ -42,10 +51,20 @@ def load_summary_prompt_template() -> str:
     Raises:
         SummarizerError: If the prompt template file does not exist.
     """
+    logger.info("Loading summary prompt template. path=%s", PROMPT_PATH)
+
     if not PROMPT_PATH.exists():
+        logger.error("Summary prompt template not found. path=%s", PROMPT_PATH)
         raise SummarizerError(f"Summary prompt template not found: {PROMPT_PATH}")
 
-    return PROMPT_PATH.read_text(encoding="utf-8")
+    template = PROMPT_PATH.read_text(encoding="utf-8")
+
+    logger.info(
+        "Summary prompt template loaded successfully. template_length=%s",
+        len(template),
+    )
+
+    return template
 
 
 def build_summary_prompt(document_content: str) -> str:
@@ -62,11 +81,23 @@ def build_summary_prompt(document_content: str) -> str:
         SummarizerError: If the document content is empty.
     """
     if not document_content or not document_content.strip():
+        logger.warning("Summary prompt build skipped because document content is empty.")
         raise SummarizerError("Document content cannot be empty.")
 
-    template = load_summary_prompt_template()
+    logger.info(
+        "Building summary prompt. document_length=%s",
+        len(document_content),
+    )
 
-    return template.replace("{document_content}", document_content)
+    template = load_summary_prompt_template()
+    prompt = template.replace("{document_content}", document_content)
+
+    logger.info(
+        "Summary prompt built successfully. prompt_length=%s",
+        len(prompt),
+    )
+
+    return prompt
 
 
 def summarize_document(filename: str) -> str:
@@ -84,15 +115,46 @@ def summarize_document(filename: str) -> str:
         ValueError: If the requested document has an unsupported extension.
         SummarizerError: If the prompt cannot be built or the local LLM fails.
     """
+    logger.info("Document summarization started. filename=%s", filename)
+
     try:
         document_content = read_document(filename)
+
+        logger.info(
+            "Document loaded for summarization. filename=%s document_length=%s",
+            filename,
+            len(document_content),
+        )
+
         prompt = build_summary_prompt(document_content)
         summary = generate_text(prompt)
+
     except FileNotFoundError:
+        logger.warning(
+            "Document summarization failed because file was not found. filename=%s",
+            filename,
+        )
         raise
+
     except ValueError:
+        logger.warning(
+            "Document summarization failed because file extension is unsupported. filename=%s",
+            filename,
+        )
         raise
+
     except Exception as error:
+        logger.error(
+            "Document summarization failed due to internal error. filename=%s error=%s",
+            filename,
+            error,
+        )
         raise SummarizerError(f"Error summarizing document '{filename}': {error}") from error
+
+    logger.info(
+        "Document summarization finished successfully. filename=%s summary_length=%s",
+        filename,
+        len(summary),
+    )
 
     return summary

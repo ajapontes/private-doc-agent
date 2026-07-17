@@ -7,11 +7,22 @@ a locally running Ollama server.
 The rest of the application should use this service instead of calling
 Ollama directly. This keeps the LLM integration isolated, easier to test,
 and easier to replace later with another local model provider if needed.
+
+Logging strategy:
+- Logs local LLM requests and responses using metadata only.
+- Logs model name, endpoint, prompt length and response length.
+- Does not log full prompts or generated responses to avoid exposing
+  private document content.
 """
+
+import logging
 
 import requests
 
 from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClientError(Exception):
@@ -40,6 +51,7 @@ def generate_text(prompt: str) -> str:
         or if the response from Ollama is invalid.
     """
     if not prompt or not prompt.strip():
+        logger.warning("Local LLM request skipped because prompt is empty.")
         raise LLMClientError("Prompt cannot be empty.")
 
     endpoint = f"{OLLAMA_BASE_URL}/api/generate"
@@ -50,10 +62,37 @@ def generate_text(prompt: str) -> str:
         "stream": False,
     }
 
+    logger.info(
+        "Sending prompt to local LLM. model=%s endpoint=%s prompt_length=%s",
+        OLLAMA_MODEL,
+        endpoint,
+        len(prompt),
+    )
+
     try:
         response = requests.post(endpoint, json=payload, timeout=120)
+
+        if response.status_code == 404:
+            logger.error(
+                "Local LLM endpoint not found. endpoint=%s model=%s status_code=%s",
+                endpoint,
+                OLLAMA_MODEL,
+                response.status_code,
+            )
+            raise LLMClientError(
+                f"Ollama endpoint not found: {endpoint}. "
+                "Verify that Ollama is running and that OLLAMA_BASE_URL points to the correct server."
+            )
+
         response.raise_for_status()
+
     except requests.exceptions.RequestException as error:
+        logger.error(
+            "Error communicating with local LLM. endpoint=%s model=%s error=%s",
+            endpoint,
+            OLLAMA_MODEL,
+            error,
+        )
         raise LLMClientError(f"Error communicating with local LLM: {error}") from error
 
     data = response.json()
@@ -61,6 +100,18 @@ def generate_text(prompt: str) -> str:
     generated_text = data.get("response")
 
     if generated_text is None:
+        logger.error(
+            "Invalid response from local LLM. Missing response field. model=%s",
+            OLLAMA_MODEL,
+        )
         raise LLMClientError("Invalid response from local LLM. Missing 'response' field.")
 
-    return generated_text.strip()
+    generated_text = generated_text.strip()
+
+    logger.info(
+        "Local LLM response received. model=%s response_length=%s",
+        OLLAMA_MODEL,
+        len(generated_text),
+    )
+
+    return generated_text

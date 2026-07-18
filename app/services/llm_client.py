@@ -20,7 +20,7 @@ import logging
 import requests
 
 from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
-
+from app.logging_config import log_llm_interaction
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,12 @@ def generate_text(prompt: str) -> str:
         "Local LLM response received. model=%s response_length=%s",
         OLLAMA_MODEL,
         len(generated_text),
+    )
+
+    log_llm_interaction(
+        prompt=prompt,
+        response=generated_text,
+        model=OLLAMA_MODEL,
     )
 
     return generated_text

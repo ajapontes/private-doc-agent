@@ -6,7 +6,7 @@ The project is being built incrementally, starting from deterministic document l
 
 ## Current Version
 
-v0.2.1
+v0.2.2
 
 ## What it does now
 

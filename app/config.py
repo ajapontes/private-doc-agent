@@ -20,7 +20,7 @@ load_dotenv()
 
 # Application metadata
 APP_NAME = "private-doc-agent"
-APP_VERSION = "0.2.1"
+APP_VERSION = "0.2.2"
 
 
 # Base project paths

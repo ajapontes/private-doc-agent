@@ -5,8 +5,8 @@ This module centralizes the main configuration values used by the
 Private Doc Agent application, including application metadata,
 local document paths, supported file extensions, and local LLM settings.
 
-The values related to Ollama are loaded from environment variables
-defined in the .env file.
+The values related to Ollama and document chunking are loaded from
+environment variables defined in the .env file.
 """
 
 from pathlib import Path
@@ -36,3 +36,8 @@ SUPPORTED_EXTENSIONS = {".txt", ".md"}
 # Local LLM configuration
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3.5:4b")
+
+
+# Document chunking configuration for the RAG pipeline
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))

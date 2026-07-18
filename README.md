@@ -1,38 +1,3 @@
-
-Genera un nuevo readme.md del proyecto que solo describa lo construido, la ultima version contenia ifnormacion del promt y la conversacion que tuvimos, centrate en solo documentar lo implementado y como lo desplegamos que ya esta en el archivo compartido, lo que debemos eliminar es todo lo que fue nuestra conversacion, generame un nuevo archivo readme.md 
-
-Ha pensado durante 4m 18s
-He generado un README limpio que contiene exclusivamente:
-
-Funcionalidades implementadas hasta v0.2.2.
-
-Arquitectura actual.
-
-Estructura del proyecto.
-
-Instalación y despliegue local.
-
-Configuración de Ollama.
-
-Endpoints disponibles.
-
-Logging general y de interacciones con el LLM.
-
-Historial de versiones construidas.
-
-Limitaciones y consideraciones de privacidad.
-
-Eliminé la conversación, prompts de trabajo, roadmap y commits sugeridos.
-
-
-
-Biblioteca
-/
-Proyectos de IA
-/
-README.md
-
-
 # private-doc-agent
 
 Private Doc Agent is a local-first API for reading, searching, and summarizing private documents. It runs the application and language model locally so document processing does not depend on an external LLM service.

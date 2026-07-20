@@ -27,6 +27,7 @@ APP_VERSION = "0.2.2"
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 INPUT_DIR = DATA_DIR / "input"
+CHROMA_DIR = DATA_DIR / "chroma"
 
 
 # Supported document types for this version
@@ -45,3 +46,10 @@ OLLAMA_EMBEDDING_MODEL = os.getenv(
 # Document chunking configuration for the RAG pipeline
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
+
+
+# Local vector store configuration
+CHROMA_COLLECTION_NAME = os.getenv(
+    "CHROMA_COLLECTION_NAME",
+    "private_documents",
+)

@@ -4,6 +4,7 @@ __pycache__/
 .env
 
 data/processed/
+data/chroma/
 logs/
 *.log
 chroma_db/

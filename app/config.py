@@ -41,6 +41,7 @@ OLLAMA_EMBEDDING_MODEL = os.getenv(
     "OLLAMA_EMBEDDING_MODEL",
     "nomic-embed-text-v2-moe:latest",
 )
+EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 
 
 # Document chunking configuration for the RAG pipeline

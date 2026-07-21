@@ -6,6 +6,7 @@ This validates real ChromaDB storage and retrieval without using Ollama,
 private documents, or the project's local ``data/chroma`` directory.
 """
 
+import gc
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,7 +27,9 @@ class VectorStoreTests(unittest.TestCase):
 
     def setUp(self):
         """Creates an isolated ChromaDB directory for each test."""
-        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.temporary_directory = tempfile.TemporaryDirectory(
+            ignore_cleanup_errors=True
+        )
         self.path_patch = patch(
             "app.services.vector_store.CHROMA_DIR",
             Path(self.temporary_directory.name),
@@ -36,6 +39,7 @@ class VectorStoreTests(unittest.TestCase):
     def tearDown(self):
         """Releases the isolated ChromaDB directory after each test."""
         close_vector_store()
+        gc.collect()
         self.path_patch.stop()
         self.temporary_directory.cleanup()
 

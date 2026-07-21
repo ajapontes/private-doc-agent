@@ -10,9 +10,11 @@ Current capabilities:
 4. Simple keyword search across .txt and .md files.
 5. Local LLM-powered document summarization.
 6. Application logging for traceability and debugging.
+7. Local document indexing with chunking, embeddings, and ChromaDB.
 """
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -20,19 +22,40 @@ from pydantic import BaseModel
 from app.config import APP_NAME, APP_VERSION, OLLAMA_MODEL
 from app.logging_config import setup_logging, log_execution_separator
 from app.services.document_loader import list_documents, read_document
+from app.services.indexing_service import (
+    IndexingServiceError,
+    index_all_documents,
+    index_document,
+)
 from app.services.simple_search import search_keyword
 from app.services.summarizer import summarize_document, SummarizerError
+from app.services.vector_store import close_vector_store
 
 
 setup_logging()
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """
+    Manages resources used during the FastAPI application lifetime.
+
+    ChromaDB is opened lazily on the first vector operation and closed when
+    the application stops, releasing SQLite and vector-index file handles.
+    """
+    yield
+    close_vector_store()
+
+
 app = FastAPI(
     title="Private Doc Agent",
     description="Local-first assistant for private document analysis.",
     version=APP_VERSION,
+    lifespan=lifespan,
 )
+
 
 @app.middleware("http")
 async def add_log_separator(request, call_next):
@@ -50,6 +73,7 @@ async def add_log_separator(request, call_next):
     response = await call_next(request)
 
     return response
+
 
 class SearchRequest(BaseModel):
     """
@@ -91,7 +115,6 @@ def health_check():
 
 
 @app.get("/documents")
-@app.get("/documents")
 def get_documents():
     """
     Lists all supported documents available in the local input folder.
@@ -106,6 +129,54 @@ def get_documents():
         "documents": documents,
         "count": len(documents),
     }
+
+
+@app.post("/documents/index")
+def index_available_documents():
+    """
+    Indexes every supported document available in the local input folder.
+    """
+    logger.info("Bulk document indexing requested.")
+
+    try:
+        result = index_all_documents()
+    except IndexingServiceError as error:
+        logger.error("Bulk document indexing failed. error=%s", error)
+        raise HTTPException(status_code=500, detail=str(error))
+
+    logger.info(
+        "Bulk document indexing completed. documents_indexed=%s chunks_indexed=%s",
+        result["documents_indexed"],
+        result["chunks_indexed"],
+    )
+
+    return result
+
+
+@app.post("/documents/{filename}/index")
+def index_available_document(filename: str):
+    """Indexes one supported local document by filename."""
+    logger.info("Single document indexing requested. filename=%s", filename)
+
+    try:
+        result = index_document(filename)
+    except FileNotFoundError as error:
+        logger.warning("Document indexing failed. filename=%s error=%s", filename, error)
+        raise HTTPException(status_code=404, detail=str(error))
+    except ValueError as error:
+        logger.warning("Document indexing failed. filename=%s error=%s", filename, error)
+        raise HTTPException(status_code=400, detail=str(error))
+    except IndexingServiceError as error:
+        logger.error("Document indexing failed. filename=%s error=%s", filename, error)
+        raise HTTPException(status_code=500, detail=str(error))
+
+    logger.info(
+        "Single document indexing completed. filename=%s chunks_indexed=%s",
+        filename,
+        result["chunks_indexed"],
+    )
+
+    return result
 
 
 @app.get("/documents/{filename}")
@@ -132,6 +203,7 @@ def get_document(filename: str):
         logger.warning("Unsupported document requested. filename=%s error=%s", filename, error)
         raise HTTPException(status_code=400, detail=str(error))
 
+
 @app.post("/search")
 def search_documents(request: SearchRequest):
     """
@@ -152,6 +224,7 @@ def search_documents(request: SearchRequest):
         "matches": results,
         "count": len(results),
     }
+
 
 @app.post("/summarize")
 def summarize_local_document(request: SummarizeRequest):

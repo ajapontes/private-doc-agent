@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from app.services.vector_store import (
     VectorStoreError,
+    close_vector_store,
     count_stored_chunks,
     delete_document_chunks,
     query_similar_chunks,
@@ -34,6 +35,7 @@ class VectorStoreTests(unittest.TestCase):
 
     def tearDown(self):
         """Releases the isolated ChromaDB directory after each test."""
+        close_vector_store()
         self.path_patch.stop()
         self.temporary_directory.cleanup()
 

@@ -23,11 +23,40 @@ from app.config import CHROMA_COLLECTION_NAME, CHROMA_DIR
 
 logger = logging.getLogger(__name__)
 
+_client = None
+
 
 class VectorStoreError(Exception):
     """Raised when local vector storage or retrieval cannot be completed."""
 
     pass
+
+
+def get_client():
+    """
+    Opens or reuses the persistent local ChromaDB client.
+
+    The client is shared so the application does not repeatedly open SQLite
+    and vector-index files. Call ``close_vector_store`` during application or
+    test shutdown to release those resources explicitly.
+    """
+    global _client
+
+    if _client is None:
+        CHROMA_DIR.mkdir(parents=True, exist_ok=True)
+        _client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+
+    return _client
+
+
+def close_vector_store() -> None:
+    """Closes the shared ChromaDB client and releases local file handles."""
+    global _client
+
+    if _client is not None:
+        _client.close()
+        _client = None
+        logger.info("Local vector store client closed.")
 
 
 def get_collection():
@@ -41,10 +70,7 @@ def get_collection():
         VectorStoreError: If ChromaDB cannot open or create the collection.
     """
     try:
-        CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-
-        return client.get_or_create_collection(
+        return get_client().get_or_create_collection(
             name=CHROMA_COLLECTION_NAME,
             embedding_function=None,
             configuration={"hnsw": {"space": "cosine"}},

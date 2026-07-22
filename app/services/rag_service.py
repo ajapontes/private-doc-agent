@@ -14,6 +14,7 @@ Logging strategy:
 import logging
 
 from app.config import BASE_DIR
+from app.logging_config import setup_logging
 from app.services.llm_client import LLMClientError, generate_text
 from app.services.retrieval_service import (
     RetrievalServiceError,
@@ -88,6 +89,10 @@ def answer_question(question: str, top_k: int = 3) -> dict:
     Empty retrieval results are returned without calling the LLM. Retrieval
     and generation failures are exposed as a single RAG-layer exception.
     """
+    setup_logging()
+
+    logger.info("RAG answer generation started. top_k=%s", top_k)
+
     try:
         retrieval_result = retrieve_relevant_chunks(question, top_k=top_k)
     except (ValueError, TypeError):

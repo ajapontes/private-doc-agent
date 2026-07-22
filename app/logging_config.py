@@ -35,6 +35,10 @@ LLM_IO_LOG_FILE = LOG_DIR / "llm_io.log"
 # Visual separator used to identify different API executions in the log file.
 LOG_SEPARATOR = "-" * 96
 
+# Private attributes used to recognize handlers owned by this application.
+_CONSOLE_HANDLER_MARKER = "_private_doc_agent_console_handler"
+_FILE_HANDLER_MARKER = "_private_doc_agent_file_handler"
+
 
 def setup_logging() -> None:
     """
@@ -45,7 +49,8 @@ def setup_logging() -> None:
     - Rotating file logging for general application logs.
     - A consistent log format with timestamp, level, logger name and message.
 
-    This function should be called once when the FastAPI application starts.
+    This function is idempotent and can be called from FastAPI, scripts, or
+    direct service executions without adding duplicate handlers.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -54,25 +59,35 @@ def setup_logging() -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
 
-    # Avoid adding duplicate handlers when Uvicorn reloads the application.
-    if root_logger.handlers:
-        return
+    formatter = logging.Formatter(log_format)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(logging.Formatter(log_format))
-
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=1_000_000,
-        backupCount=3,
-        encoding="utf-8",
+    has_console_handler = any(
+        getattr(handler, _CONSOLE_HANDLER_MARKER, False)
+        for handler in root_logger.handlers
     )
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter(log_format))
+    has_file_handler = any(
+        getattr(handler, _FILE_HANDLER_MARKER, False)
+        for handler in root_logger.handlers
+    )
 
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
+    if not has_console_handler:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        setattr(console_handler, _CONSOLE_HANDLER_MARKER, True)
+        root_logger.addHandler(console_handler)
+
+    if not has_file_handler:
+        file_handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=1_000_000,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        setattr(file_handler, _FILE_HANDLER_MARKER, True)
+        root_logger.addHandler(file_handler)
 
 
 def log_execution_separator(logger_name: str = "app.execution") -> None:

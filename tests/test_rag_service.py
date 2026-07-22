@@ -48,8 +48,9 @@ class RAGServiceTests(unittest.TestCase):
 
     @patch("app.services.rag_service.generate_text")
     @patch("app.services.rag_service.retrieve_relevant_chunks")
+    @patch("app.services.rag_service.setup_logging")
     def test_answer_returns_generated_text_and_source_metadata(
-        self, mock_retrieve, mock_generate
+        self, mock_setup_logging, mock_retrieve, mock_generate
     ):
         """A grounded answer includes traceable sources without full content."""
         mock_retrieve.return_value = {
@@ -69,6 +70,7 @@ class RAGServiceTests(unittest.TestCase):
         self.assertNotIn("content", result["sources"][0])
         mock_retrieve.assert_called_once_with("  What does it do?  ", top_k=2)
         mock_generate.assert_called_once()
+        mock_setup_logging.assert_called_once_with()
 
     @patch("app.services.rag_service.generate_text")
     @patch("app.services.rag_service.retrieve_relevant_chunks")

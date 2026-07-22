@@ -12,6 +12,7 @@ Logging strategy:
 
 import logging
 
+from app.logging_config import setup_logging
 from app.services.embedding_service import EmbeddingServiceError, embed_query
 from app.services.vector_store import VectorStoreError, query_chunks
 
@@ -40,6 +41,8 @@ def retrieve_relevant_chunks(question: str, top_k: int = 3) -> dict:
         ValueError: If the question or result limit is invalid.
         RetrievalServiceError: If embedding generation or vector search fails.
     """
+    setup_logging()
+
     if not isinstance(question, str) or not question.strip():
         raise ValueError("Question cannot be empty.")
 

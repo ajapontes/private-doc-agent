@@ -17,7 +17,7 @@ from app.services.vector_store import (
     close_vector_store,
     count_stored_chunks,
     delete_document_chunks,
-    query_similar_chunks,
+    query_chunks,
     upsert_chunks,
 )
 
@@ -84,15 +84,15 @@ class VectorStoreTests(unittest.TestCase):
         """Cosine search ranks the most similar handcrafted vector first."""
         upsert_chunks(self._chunks(), [[1.0, 0.0], [0.0, 1.0]])
 
-        matches = query_similar_chunks([0.9, 0.1], n_results=2)
+        matches = query_chunks([0.9, 0.1], top_k=2)
 
         self.assertEqual(len(matches), 2)
-        self.assertEqual(matches[0]["metadata"]["chunk_id"], 0)
-        self.assertGreater(matches[0]["similarity"], matches[1]["similarity"])
+        self.assertEqual(matches[0]["chunk_id"], 0)
+        self.assertLess(matches[0]["distance"], matches[1]["distance"])
 
     def test_query_empty_collection_returns_no_matches(self):
         """Searching before indexing returns an empty result safely."""
-        self.assertEqual(query_similar_chunks([1.0, 0.0]), [])
+        self.assertEqual(query_chunks([1.0, 0.0]), [])
 
     def test_document_chunks_can_be_deleted_by_filename(self):
         """Reindexing can remove all old chunks for one source document."""
@@ -110,12 +110,12 @@ class VectorStoreTests(unittest.TestCase):
     def test_empty_query_embedding_is_rejected(self):
         """A vector search requires a non-empty query embedding."""
         with self.assertRaisesRegex(VectorStoreError, "cannot be empty"):
-            query_similar_chunks([])
+            query_chunks([])
 
     def test_invalid_result_count_is_rejected(self):
         """A vector search must request at least one result."""
         with self.assertRaisesRegex(VectorStoreError, "greater than zero"):
-            query_similar_chunks([1.0, 0.0], n_results=0)
+            query_chunks([1.0, 0.0], top_k=0)
 
 
 if __name__ == "__main__":

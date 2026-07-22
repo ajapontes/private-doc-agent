@@ -178,20 +178,20 @@ def upsert_chunks(chunks: list[dict], embeddings: list[list[float]]) -> int:
     return len(chunks)
 
 
-def query_similar_chunks(
+def query_chunks(
     query_embedding: list[float],
-    n_results: int = 5,
+    top_k: int = 3,
 ) -> list[dict]:
     """
     Retrieves the document chunks closest to a query embedding.
 
     Args:
         query_embedding: Numeric vector produced for a user question.
-        n_results: Maximum number of relevant chunks to return.
+        top_k: Maximum number of closest chunks to return.
 
     Returns:
-        Ranked chunk dictionaries containing content, metadata, distance,
-        and cosine similarity.
+        Ranked chunk dictionaries containing content, source metadata, and
+        the cosine distance reported by ChromaDB.
 
     Raises:
         VectorStoreError: If inputs are invalid or retrieval fails.
@@ -199,7 +199,7 @@ def query_similar_chunks(
     if not isinstance(query_embedding, list) or not query_embedding:
         raise VectorStoreError("Query embedding cannot be empty.")
 
-    if n_results <= 0:
+    if top_k <= 0:
         raise VectorStoreError("Result count must be greater than zero.")
 
     try:
@@ -212,7 +212,7 @@ def query_similar_chunks(
 
         result = collection.query(
             query_embeddings=[query_embedding],
-            n_results=min(n_results, stored_count),
+            n_results=min(top_k, stored_count),
             include=["documents", "metadatas", "distances"],
         )
     except VectorStoreError:
@@ -221,32 +221,27 @@ def query_similar_chunks(
         logger.error("Unable to query local vector collection. error=%s", error)
         raise VectorStoreError(f"Unable to query local vector collection: {error}") from error
 
-    ids = result.get("ids", [[]])[0]
     documents = result.get("documents", [[]])[0]
     metadatas = result.get("metadatas", [[]])[0]
     distances = result.get("distances", [[]])[0]
 
     matches = []
 
-    for record_id, document, metadata, distance in zip(
-        ids,
-        documents,
-        metadatas,
-        distances,
-    ):
+    for document, metadata, distance in zip(documents, metadatas, distances):
         matches.append(
             {
-                "id": record_id,
+                "filename": metadata["filename"],
+                "chunk_id": metadata["chunk_id"],
                 "content": document,
-                "metadata": metadata,
+                "start_char": metadata["start_char"],
+                "end_char": metadata["end_char"],
                 "distance": distance,
-                "similarity": 1 - distance,
             }
         )
 
     logger.info(
         "Vector search completed. requested_results=%s returned_results=%s",
-        n_results,
+        top_k,
         len(matches),
     )
 

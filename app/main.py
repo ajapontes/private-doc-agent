@@ -12,6 +12,7 @@ Current capabilities:
 6. Application logging for traceability and debugging.
 7. Local document indexing with chunking, embeddings, and ChromaDB.
 8. Semantic retrieval of relevant document chunks.
+9. Retrieval-augmented question answering with traceable sources.
 """
 
 import logging
@@ -28,6 +29,7 @@ from app.services.indexing_service import (
     index_all_documents,
     index_document,
 )
+from app.services.rag_service import RAGServiceError, answer_question
 from app.services.retrieval_service import (
     RetrievalServiceError,
     retrieve_relevant_chunks,
@@ -109,6 +111,19 @@ class RetrievalRequest(BaseModel):
     Attributes:
         question: Natural-language question used for vector search.
         top_k: Maximum number of relevant chunks to return.
+    """
+
+    question: str
+    top_k: int = 3
+
+
+class AskRequest(BaseModel):
+    """
+    Request model for retrieval-augmented question answering.
+
+    Attributes:
+        question: Natural-language question to answer from indexed documents.
+        top_k: Maximum number of relevant chunks to use as evidence.
     """
 
     question: str
@@ -264,6 +279,32 @@ def retrieve_document_chunks(request: RetrievalRequest):
     logger.info(
         "Semantic retrieval request completed. matches=%s",
         len(result["matches"]),
+    )
+
+    return result
+
+
+@app.post("/ask")
+def ask_document_question(request: AskRequest):
+    """Answers a question using only evidence from indexed documents."""
+    logger.info("RAG API request received. top_k=%s", request.top_k)
+
+    try:
+        result = answer_question(
+            question=request.question,
+            top_k=request.top_k,
+        )
+    except (ValueError, TypeError) as error:
+        logger.warning("RAG API request rejected. error=%s", error)
+        raise HTTPException(status_code=400, detail=str(error))
+    except RAGServiceError as error:
+        logger.error("RAG API request failed. error=%s", error)
+        raise HTTPException(status_code=500, detail=str(error))
+
+    logger.info(
+        "RAG API request completed. sources=%s answer_length=%s",
+        len(result["sources"]),
+        len(result["answer"]),
     )
 
     return result

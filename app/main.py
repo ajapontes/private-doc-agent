@@ -11,6 +11,7 @@ Current capabilities:
 5. Local LLM-powered document summarization.
 6. Application logging for traceability and debugging.
 7. Local document indexing with chunking, embeddings, and ChromaDB.
+8. Semantic retrieval of relevant document chunks.
 """
 
 import logging
@@ -26,6 +27,10 @@ from app.services.indexing_service import (
     IndexingServiceError,
     index_all_documents,
     index_document,
+)
+from app.services.retrieval_service import (
+    RetrievalServiceError,
+    retrieve_relevant_chunks,
 )
 from app.services.simple_search import search_keyword
 from app.services.summarizer import summarize_document, SummarizerError
@@ -95,6 +100,19 @@ class SummarizeRequest(BaseModel):
     """
 
     filename: str
+
+
+class RetrievalRequest(BaseModel):
+    """
+    Request model for semantic document retrieval.
+
+    Attributes:
+        question: Natural-language question used for vector search.
+        top_k: Maximum number of relevant chunks to return.
+    """
+
+    question: str
+    top_k: int = 3
 
 
 @app.get("/health")
@@ -224,6 +242,31 @@ def search_documents(request: SearchRequest):
         "matches": results,
         "count": len(results),
     }
+
+
+@app.post("/retrieve")
+def retrieve_document_chunks(request: RetrievalRequest):
+    """Retrieves document chunks semantically related to a question."""
+    logger.info("Semantic retrieval requested. top_k=%s", request.top_k)
+
+    try:
+        result = retrieve_relevant_chunks(
+            question=request.question,
+            top_k=request.top_k,
+        )
+    except ValueError as error:
+        logger.warning("Semantic retrieval request rejected. error=%s", error)
+        raise HTTPException(status_code=400, detail=str(error))
+    except RetrievalServiceError as error:
+        logger.error("Semantic retrieval request failed. error=%s", error)
+        raise HTTPException(status_code=500, detail=str(error))
+
+    logger.info(
+        "Semantic retrieval request completed. matches=%s",
+        len(result["matches"]),
+    )
+
+    return result
 
 
 @app.post("/summarize")

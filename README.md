@@ -4,12 +4,12 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 
 ## Current version
 
-`v0.3.0`
+`v0.4.0`
 
 ## Implemented capabilities
 
 - FastAPI backend with interactive OpenAPI documentation.
-- Discovery and reading of local `.txt` and `.md` documents.
+- Discovery, text extraction, and reading of local `.txt`, `.md`, `.pdf`, and `.docx` documents.
 - Case-insensitive keyword search.
 - Document summarization with a local Ollama model.
 - Configurable text chunking with overlap.
@@ -18,12 +18,13 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 - Indexing of one document or all supported documents.
 - Semantic retrieval of relevant document chunks.
 - Retrieval-augmented generation (RAG) with traceable sources.
-- Grounded answers based only on retrieved document evidence.
+- Grounded answers based on retrieved document evidence.
+- Controlled behavior when the available documents do not provide sufficient context.
 - Centralized console and rotating-file logging.
 - Separate local logging of complete LLM prompts and responses for debugging.
-- Automated tests for chunking, embeddings, vector storage, indexing, retrieval, RAG, API endpoints, and logging.
+- Automated tests for document loading, chunking, embeddings, vector storage, indexing, retrieval, RAG, API endpoints, and logging.
 
-Agents, MCP integrations, a frontend, and support for document formats other than `.txt` and `.md` are not implemented in this version.
+Agents, MCP integrations, a frontend, and formats other than `.txt`, `.md`, `.pdf`, and `.docx` are not implemented in this version.
 
 ## Architecture
 
@@ -33,158 +34,119 @@ Client / Swagger
        v
     FastAPI
        |
-       +--------------------+---------------------+
-       |                    |                     |
-       v                    v                     v
-Document operations   Indexing pipeline      RAG query pipeline
-list / read / search  load -> chunk           question embedding
-summarize             -> embeddings           -> ChromaDB search
-                      -> ChromaDB              -> RAG prompt
-                                               -> local LLM
-                                               -> answer + sources
+       +----------------------+-----------------------+
+       |                      |                       |
+       v                      v                       v
+Document operations    Indexing pipeline       RAG query pipeline
+list / read / search   load -> chunk            embed question
+summarize              -> embed -> ChromaDB     -> retrieve chunks
+                                               -> build prompt
+                                               -> Ollama answer
+                                               -> sources
 ```
 
-Keyword search is literal and does not use embeddings. Semantic retrieval and RAG require documents to be indexed first.
+### Main components
 
-## Project structure
+- **FastAPI:** exposes the application endpoints and interactive API documentation.
+- **Document loader:** discovers supported files and extracts their text through a unified interface.
+- **Document chunker:** divides extracted text into overlapping fragments.
+- **Embedding service:** creates document and query embeddings through Ollama.
+- **ChromaDB vector store:** persists embeddings and document metadata locally.
+- **Indexing service:** coordinates loading, chunking, embedding generation, and storage.
+- **Retrieval service:** finds the chunks most closely related to a question.
+- **RAG service:** builds a grounded prompt, invokes the local model, and returns the answer with its sources.
+- **Logging:** separates operational metadata from complete, potentially sensitive LLM interactions.
+
+## Supported document formats
+
+| Format | Extension | Processing |
+|---|---|---|
+| Plain text | `.txt` | Read directly as text. |
+| Markdown | `.md` | Read directly as text. |
+| PDF | `.pdf` | Extract text from the document's embedded text layer. |
+| Microsoft Word | `.docx` | Extract text from document paragraphs. |
+
+Place local documents in:
 
 ```text
-private-doc-agent/
-  app/
-    main.py
-    config.py
-    logging_config.py
-    prompts/
-      summarize_prompt.txt
-      rag_prompt.txt
-    services/
-      document_loader.py
-      simple_search.py
-      document_chunker.py
-      embedding_service.py
-      vector_store.py
-      indexing_service.py
-      retrieval_service.py
-      llm_client.py
-      summarizer.py
-      rag_service.py
-  data/
-    input/
-    chroma/
-  logs/
-    app.log
-    llm_io.log
-  tests/
-  .env.example
-  .gitignore
-  README.md
-  requirements.txt
+data/input/
 ```
 
-The `data/chroma/` and `logs/` directories are generated locally and must not be committed.
+New files in this directory are ignored by Git to prevent private documents from being added accidentally. The versioned `demo.txt`, `demo.md`, and `demo.pdf` files remain available for development and testing.
 
 ## Requirements
 
 - Python 3.11 or later.
 - Ollama installed and running locally.
-- A local text-generation model, such as `qwen3.5:4b`.
-- A local embedding model, such as `nomic-embed-text-v2-moe:latest`.
-- Dependencies listed in `requirements.txt`.
+- A local generation model configured through `OLLAMA_MODEL`.
+- A local embedding model configured through the application settings.
 
-## Local deployment
+The default Ollama URL is:
 
-### 1. Clone the repository
+```text
+http://localhost:11434
+```
+
+## Installation
+
+Clone the repository:
 
 ```powershell
 git clone https://github.com/ajapontes/private-doc-agent.git
 cd private-doc-agent
 ```
 
-### 2. Create and activate a virtual environment
+Create and activate a virtual environment:
 
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 3. Install dependencies
+Install the dependencies:
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-### 4. Configure the environment
-
-Create `.env` from `.env.example`:
+Create a local environment file based on the example included in the repository, if available:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Default configuration:
-
-```env
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen3.5:4b
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text-v2-moe:latest
-EMBEDDING_BATCH_SIZE=32
-CHUNK_SIZE=1000
-CHUNK_OVERLAP=200
-CHROMA_COLLECTION_NAME=private_documents
-```
-
-`CHUNK_OVERLAP` must be smaller than `CHUNK_SIZE`. The `.env` file contains local configuration and must not be committed.
-
-### 5. Start and validate Ollama
-
-Confirm that Ollama is available:
+Review the values in `.env` and confirm that the required Ollama models are installed:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing http://localhost:11434
 ollama list
 ```
 
-Install the configured models if necessary:
+## Run the API
+
+Start the development server:
 
 ```powershell
-ollama pull qwen3.5:4b
-ollama pull nomic-embed-text-v2-moe:latest
+python -m uvicorn app.main:app --reload
 ```
 
-### 6. Add documents
-
-Copy supported `.txt` or `.md` files into:
-
-```text
-data/input/
-```
-
-### 7. Start the API
-
-```powershell
-uvicorn app.main:app --reload
-```
-
-API base URL:
+The API is available at:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Interactive documentation:
+Interactive Swagger documentation:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
-## Recommended RAG workflow
+Alternative ReDoc documentation:
 
-1. Add documents to `data/input/`.
-2. Index one document with `POST /documents/{filename}/index` or all documents with `POST /documents/index`.
-3. Inspect semantic matches with `POST /retrieve` when needed.
-4. Ask grounded questions with `POST /ask`.
-
-Reindex a document after changing its content. The indexing workflow replaces that document's previously stored chunks only after the new embeddings have been generated successfully.
+```text
+http://127.0.0.1:8000/redoc
+```
 
 ## API endpoints
 
@@ -192,13 +154,13 @@ Reindex a document after changing its content. The indexing workflow replaces th
 |---|---|---|
 | `GET` | `/health` | Return application health and version. |
 | `GET` | `/documents` | List supported local documents. |
-| `GET` | `/documents/{filename}` | Read a document. |
+| `GET` | `/documents/{filename}` | Read a supported document. |
 | `POST` | `/documents/index` | Index all supported documents. |
 | `POST` | `/documents/{filename}/index` | Index one document. |
 | `POST` | `/search` | Perform literal keyword search. |
 | `POST` | `/retrieve` | Retrieve semantically related chunks. |
 | `POST` | `/summarize` | Summarize one complete document. |
-| `POST` | `/ask` | Generate a RAG answer with source metadata. |
+| `POST` | `/ask` | Generate a grounded RAG answer with source metadata. |
 
 ### Health check
 
@@ -206,13 +168,31 @@ Reindex a document after changing its content. The indexing workflow replaces th
 GET /health
 ```
 
+Example response:
+
 ```json
 {
   "status": "ok",
   "app": "private-doc-agent",
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
 ```
+
+### List documents
+
+```http
+GET /documents
+```
+
+Returns the supported documents currently available in `data/input/`.
+
+### Read a document
+
+```http
+GET /documents/demo.md
+```
+
+The document loader extracts and returns text using the appropriate reader for its format.
 
 ### Index all documents
 
@@ -220,7 +200,7 @@ GET /health
 POST /documents/index
 ```
 
-The response reports the number of documents and chunks indexed, plus the embedding model and vector dimension for each document.
+The response reports the documents and chunks indexed, together with embedding information produced by the indexing process.
 
 ### Index one document
 
@@ -228,16 +208,7 @@ The response reports the number of documents and chunks indexed, plus the embedd
 POST /documents/demo.md/index
 ```
 
-Example response:
-
-```json
-{
-  "filename": "demo.md",
-  "chunks_indexed": 2,
-  "vector_dimension": 768,
-  "embedding_model": "nomic-embed-text-v2-moe:latest"
-}
-```
+Use this endpoint to rebuild the vector index for a single supported file.
 
 ### Keyword search
 
@@ -245,11 +216,7 @@ Example response:
 POST /search
 ```
 
-```json
-{
-  "query": "RAG"
-}
-```
+Performs a case-insensitive literal search over the available supported documents.
 
 ### Semantic retrieval
 
@@ -257,93 +224,94 @@ POST /search
 POST /retrieve
 ```
 
-```json
-{
-  "question": "What does the private document assistant do?",
-  "top_k": 3
-}
-```
+Semantic retrieval embeds the query and returns the most relevant indexed chunks with their document metadata and similarity values.
 
-The response contains ranked matches with `filename`, `chunk_id`, content boundaries, chunk content, and cosine similarity.
+Documents must be indexed before they can be retrieved semantically.
 
-### Ask a grounded question
-
-```http
-POST /ask
-```
-
-```json
-{
-  "question": "¿Qué hace el asistente de documentos privados?",
-  "top_k": 2
-}
-```
-
-Example response structure:
-
-```json
-{
-  "question": "¿Qué hace el asistente de documentos privados?",
-  "answer": "El asistente permite consultar documentos privados localmente...",
-  "sources": [
-    {
-      "filename": "demo.txt",
-      "chunk_id": 0,
-      "similarity": 0.508248
-    }
-  ]
-}
-```
-
-If retrieval returns no evidence, the service does not call the language model and returns an empty `sources` list with a controlled message.
-
-### Summarize a document
+### Document summarization
 
 ```http
 POST /summarize
 ```
 
+Summarization loads the selected document and sends its extracted text to the configured local Ollama model.
+
+### Grounded question answering
+
+```http
+POST /ask
+```
+
+The RAG workflow:
+
+1. Embeds the question.
+2. Retrieves the most relevant indexed chunks.
+3. Builds a prompt containing only the retrieved evidence.
+4. Generates an answer with the local Ollama model.
+5. Returns the answer and traceable source metadata.
+
+Example response:
+
 ```json
 {
-  "filename": "demo.md"
+  "question": "What is the main objective of the project?",
+  "answer": "The project objective is described in the indexed documents.",
+  "sources": [
+    {
+      "filename": "demo.pdf",
+      "chunk_id": 0,
+      "similarity": 0.526988
+    }
+  ]
 }
 ```
 
-Summarization sends the complete document to the configured text-generation model and is separate from the chunk-based RAG flow.
-
-## Logging
-
-The application writes logs to the console and uses rotating local files to prevent unlimited growth.
-
-### Operational log
+If retrieval does not provide usable context, the API returns the controlled response:
 
 ```text
-logs/app.log
+No sufficient information was found in the available documents.
 ```
 
-This log records request flow, filenames, model names, endpoints, counts, dimensions, lengths, and errors. The RAG and embedding flows avoid writing questions, retrieved content, full prompts, responses, and vectors to this log.
+## Local data and persistence
 
-View recent entries or follow the log:
+### Input documents
 
-```powershell
-Get-Content .\logs\app.log -Tail 80
-Get-Content .\logs\app.log -Wait
+```text
+data/input/
 ```
 
-### LLM input/output log
+This directory contains documents available to the application. Private input files remain local and are excluded by the repository ignore rules.
+
+### Vector database
+
+```text
+data/chroma/
+```
+
+ChromaDB persists document chunks, embeddings, and related metadata locally. This directory is not committed to Git.
+
+### Logs
+
+Operational application logs are written to the console and to rotating local log files. These logs record request flow, execution metadata, document operations, indexing, retrieval, and local LLM calls without storing complete document contents in the operational log.
+
+Complete LLM prompts and responses are written separately to:
 
 ```text
 logs/llm_io.log
 ```
 
-This debugging log contains complete prompts and model responses. Because RAG prompts can include private document fragments, this file may contain sensitive information and must remain local.
+This debugging log may include private document fragments supplied as RAG context. It must remain local and is excluded from Git.
+
+To inspect the log in PowerShell:
 
 ```powershell
 Get-Content .\logs\llm_io.log -Tail 120
 Get-Content .\logs\llm_io.log -Wait
 ```
 
-Repository ignore rules cover `.env`, `logs/`, `*.log`, and `data/chroma/`.
+The Ollama client also records response metadata useful for local diagnostics, including generated response length, thinking length, completion reason, and token evaluation counts. Prompt and response contents remain confined to the separate LLM interaction log.
+
+For supported Ollama models, thinking output is disabled in generation requests so the returned content is handled as the final answer. Missing and empty model responses produce controlled application errors instead of being accepted silently.
 
 ## Tests
 
@@ -353,7 +321,22 @@ Run the complete automated suite:
 python -m unittest discover -s tests -v
 ```
 
-The `v0.3.0` implementation contains 62 automated tests.
+The `v0.4.0` implementation contains 76 automated tests.
+
+The suite covers:
+
+- Supported document discovery and loading.
+- PDF and DOCX text extraction.
+- Text chunking and overlap validation.
+- Ollama embedding requests.
+- ChromaDB storage and retrieval.
+- Single-document and bulk indexing.
+- Semantic retrieval.
+- RAG prompt construction and grounded answers.
+- Source metadata and no-context behavior.
+- Missing and empty Ollama responses.
+- API endpoints.
+- Operational and LLM interaction logging.
 
 ## Implemented version history
 
@@ -391,19 +374,38 @@ The `v0.3.0` implementation contains 62 automated tests.
 - Logging support for direct service execution without duplicate handlers.
 - Expanded automated test suite covering the RAG pipeline.
 
+### v0.4.0 - PDF and DOCX document ingestion
+
+- Local text extraction from PDF and DOCX documents.
+- Unified document loading for `.txt`, `.md`, `.pdf`, and `.docx` files.
+- PDF and DOCX integration with the existing indexing and RAG pipelines.
+- Protection of private input documents through repository ignore rules.
+- Versioned demo documents preserved for development and testing.
+- Disabled thinking output for supported Ollama models.
+- Controlled handling of missing or empty Ollama responses.
+- Additional LLM response metadata for local diagnostics.
+- Expanded automated test suite with 76 tests.
+
 ## Current limitations
 
-- Only `.txt` and `.md` documents are supported.
-- Summarization still sends the complete document to the model.
+- Only `.txt`, `.md`, `.pdf`, and `.docx` documents are supported.
+- Scanned PDFs without an embedded text layer require OCR, which is not implemented.
+- Summarization sends the complete extracted document text to the model.
 - Indexing must be triggered manually after adding or modifying documents.
-- Retrieval uses a fixed `top_k`; reranking and similarity thresholds are not implemented.
-- RAG source references identify files and chunks but do not yet expose page numbers.
+- Retrieval uses a fixed number of results; reranking and configurable similarity thresholds are not implemented.
+- RAG source references identify files and chunks but do not expose PDF page numbers.
 - ChromaDB is intended for local, single-application use in this version.
 - There is no authentication, authorization, frontend, agent orchestration, or MCP server.
 
 ## Privacy considerations
 
-- Documents, embeddings, vector storage, and inference remain local when Ollama uses the configured local URL.
-- `.env`, `data/chroma/`, `logs/app.log`, and `logs/llm_io.log` must not be committed.
-- `logs/llm_io.log` can contain complete private document content included in prompts.
-- Access to the machine, project directory, vector database, and logs must be restricted according to document sensitivity.
+- Document processing, embeddings, vector storage, and model inference run locally.
+- Private files placed in `data/input/` are ignored by Git unless explicitly versioned.
+- Generated indexes, environment files, and logs are excluded from the repository.
+- Operational logs avoid recording complete document contents.
+- The dedicated LLM interaction log can contain prompts, answers, and retrieved private fragments; keep it on the local machine.
+- Before sharing diagnostic information, review logs and API responses for document names or sensitive content.
+
+## Repository
+
+[github.com/ajapontes/private-doc-agent](https://github.com/ajapontes/private-doc-agent)

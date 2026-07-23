@@ -4,3 +4,5 @@ pydantic
 python-dotenv
 requests
 chromadb==1.5.9
+pypdf
+python-docx

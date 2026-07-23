@@ -31,8 +31,7 @@ CHROMA_DIR = DATA_DIR / "chroma"
 
 
 # Supported document types for this version
-SUPPORTED_EXTENSIONS = {".txt", ".md"}
-
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 
 # Local LLM configuration
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

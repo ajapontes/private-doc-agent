@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 PROMPT_PATH = BASE_DIR / "app" / "prompts" / "rag_prompt.txt"
 NO_CONTEXT_ANSWER = (
-    "No se encontró información suficiente en los documentos disponibles."
+    "No sufficient information was found in the available documents."
 )
 
 

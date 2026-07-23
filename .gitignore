@@ -3,6 +3,14 @@ __pycache__/
 *.pyc
 .env
 
+# Private input documents
+data/input/*
+
+# Versioned demo documents
+!data/input/demo.md
+!data/input/demo.pdf
+!data/input/demo.txt
+
 data/processed/
 data/chroma/
 logs/

@@ -20,7 +20,7 @@ load_dotenv()
 
 # Application metadata
 APP_NAME = "private-doc-agent"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 
 
 # Base project paths
@@ -31,8 +31,7 @@ CHROMA_DIR = DATA_DIR / "chroma"
 
 
 # Supported document types for this version
-SUPPORTED_EXTENSIONS = {".txt", ".md"}
-
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 
 # Local LLM configuration
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

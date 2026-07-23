@@ -60,6 +60,7 @@ def generate_text(prompt: str) -> str:
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
+        "think": False,
     }
 
     logger.info(
@@ -97,6 +98,17 @@ def generate_text(prompt: str) -> str:
 
     data = response.json()
 
+    logger.info(
+        "Local LLM response metadata. model=%s response_length=%s "
+        "thinking_length=%s done_reason=%s prompt_eval_count=%s eval_count=%s",
+        OLLAMA_MODEL,
+        len(data.get("response", "")),
+        len(data.get("thinking", "")),
+        data.get("done_reason"),
+        data.get("prompt_eval_count"),
+        data.get("eval_count"),
+    )
+
     generated_text = data.get("response")
 
     if generated_text is None:
@@ -104,9 +116,18 @@ def generate_text(prompt: str) -> str:
             "Invalid response from local LLM. Missing response field. model=%s",
             OLLAMA_MODEL,
         )
-        raise LLMClientError("Invalid response from local LLM. Missing 'response' field.")
+        raise LLMClientError(
+            "Invalid response from local LLM. Missing 'response' field."
+        )
 
     generated_text = generated_text.strip()
+
+    if not generated_text:
+        logger.error(
+            "Local LLM returned an empty response. model=%s",
+            OLLAMA_MODEL,
+        )
+        raise LLMClientError("The local LLM returned an empty response.")
 
     logger.info(
         "Local LLM response received. model=%s response_length=%s",

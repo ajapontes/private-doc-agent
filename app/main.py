@@ -13,6 +13,7 @@ Current capabilities:
 7. Local document indexing with chunking, embeddings, and ChromaDB.
 8. Semantic retrieval of relevant document chunks.
 9. Retrieval-augmented question answering with traceable sources.
+10. Single-step local agent execution through allowlisted tools.
 """
 
 import logging
@@ -23,6 +24,11 @@ from pydantic import BaseModel
 
 from app.config import APP_NAME, APP_VERSION, OLLAMA_MODEL
 from app.logging_config import setup_logging, log_execution_separator
+from app.services.agent_service import (
+    AgentExecutionError,
+    AgentPlanningError,
+    run_agent,
+)
 from app.services.document_loader import list_documents, read_document
 from app.services.indexing_service import (
     IndexingServiceError,
@@ -128,6 +134,17 @@ class AskRequest(BaseModel):
 
     question: str
     top_k: int = 3
+
+
+class AgentRequest(BaseModel):
+    """
+    Request model for single-step local agent execution.
+
+    Attributes:
+        request: Natural-language instruction to plan and execute.
+    """
+
+    request: str
 
 
 @app.get("/health")
@@ -308,6 +325,40 @@ def ask_document_question(request: AskRequest):
     )
 
     return result
+
+
+@app.post("/agent")
+def execute_local_agent(request: AgentRequest):
+    """Plans and executes one allowlisted local tool."""
+    logger.info(
+        "Local agent API request received. request_length=%s",
+        len(request.request.strip()),
+    )
+
+    try:
+        result = run_agent(request.request)
+    except (ValueError, TypeError) as error:
+        logger.warning("Local agent API request rejected. error=%s", error)
+        raise HTTPException(status_code=400, detail=str(error))
+    except AgentPlanningError as error:
+        logger.warning(
+            "Local agent API planning failed. error_type=%s",
+            type(error).__name__,
+        )
+        raise HTTPException(status_code=422, detail=str(error))
+    except AgentExecutionError as error:
+        logger.error(
+            "Local agent API execution failed. error_type=%s",
+            type(error).__name__,
+        )
+        raise HTTPException(status_code=500, detail=str(error))
+
+    response = result.to_dict()
+    logger.info(
+        "Local agent API request completed. tools_used=%s",
+        len(response["tools_used"]),
+    )
+    return response
 
 
 @app.post("/summarize")

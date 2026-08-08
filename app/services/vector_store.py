@@ -85,6 +85,82 @@ def get_collection():
         raise VectorStoreError(f"Unable to open local vector collection: {error}") from error
 
 
+def reset_vector_store(*, confirm: bool = False) -> int:
+    """Deletes and recreates the configured vector collection safely.
+
+    This operation is required after changing the configured distance metric,
+    because ChromaDB cannot change the metric of an existing collection. The
+    explicit confirmation flag prevents accidental data loss.
+
+    Args:
+        confirm: Must be ``True`` to authorize deletion of indexed chunks.
+
+    Returns:
+        Number of chunk records removed from the previous collection.
+
+    Raises:
+        VectorStoreError: If confirmation is missing or ChromaDB cannot reset
+            the collection.
+    """
+    if confirm is not True:
+        logger.warning(
+            "Vector store reset rejected because confirmation was not provided. "
+            "collection=%s",
+            CHROMA_COLLECTION_NAME,
+        )
+        raise VectorStoreError("Vector store reset requires confirm=True.")
+
+    logger.warning(
+        "Vector store reset started. collection=%s metric=%s",
+        CHROMA_COLLECTION_NAME,
+        VECTOR_DISTANCE_METRIC,
+    )
+
+    try:
+        client = get_client()
+        collections = client.list_collections()
+        collection_names = {
+            collection if isinstance(collection, str) else collection.name
+            for collection in collections
+        }
+        deleted_count = 0
+
+        if CHROMA_COLLECTION_NAME in collection_names:
+            existing_collection = client.get_collection(
+                name=CHROMA_COLLECTION_NAME,
+                embedding_function=None,
+            )
+            deleted_count = existing_collection.count()
+            client.delete_collection(name=CHROMA_COLLECTION_NAME)
+
+        client.get_or_create_collection(
+            name=CHROMA_COLLECTION_NAME,
+            embedding_function=None,
+            configuration={"hnsw": {"space": VECTOR_DISTANCE_METRIC}},
+        )
+    except Exception as error:
+        logger.error(
+            "Unable to reset local vector collection. collection=%s metric=%s "
+            "error=%s",
+            CHROMA_COLLECTION_NAME,
+            VECTOR_DISTANCE_METRIC,
+            error,
+        )
+        raise VectorStoreError(
+            f"Unable to reset local vector collection: {error}"
+        ) from error
+
+    logger.warning(
+        "Vector store reset completed. collection=%s metric=%s "
+        "deleted_records=%s",
+        CHROMA_COLLECTION_NAME,
+        VECTOR_DISTANCE_METRIC,
+        deleted_count,
+    )
+
+    return deleted_count
+
+
 def distance_to_relevance(distance: float, metric: str | None = None) -> float:
     """Converts a ChromaDB distance into a normalized relevance score.
 

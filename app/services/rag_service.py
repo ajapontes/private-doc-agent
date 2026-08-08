@@ -124,7 +124,8 @@ def answer_question(question: str, top_k: int = 3) -> dict:
         {
             "filename": match["filename"],
             "chunk_id": match["chunk_id"],
-            "similarity": match["similarity"],
+            "distance": match["distance"],
+            "relevance_score": match["relevance_score"],
         }
         for match in matches
     ]

@@ -18,6 +18,7 @@ from app.services.vector_store import (
     count_stored_chunks,
     delete_document_chunks,
     query_chunks,
+    reset_vector_store,
     upsert_chunks,
 )
 
@@ -101,6 +102,20 @@ class VectorStoreTests(unittest.TestCase):
         delete_document_chunks("demo.txt")
 
         self.assertEqual(count_stored_chunks(), 0)
+
+    def test_vector_store_can_be_reset_with_explicit_confirmation(self):
+        """A confirmed reset removes all records and recreates the collection."""
+        upsert_chunks(self._chunks(), [[1.0, 0.0], [0.0, 1.0]])
+
+        deleted_count = reset_vector_store(confirm=True)
+
+        self.assertEqual(deleted_count, 2)
+        self.assertEqual(count_stored_chunks(), 0)
+
+    def test_vector_store_reset_requires_explicit_confirmation(self):
+        """Resetting indexed data is rejected unless explicitly confirmed."""
+        with self.assertRaisesRegex(VectorStoreError, "confirm=True"):
+            reset_vector_store()
 
     def test_mismatched_chunk_and_embedding_counts_are_rejected(self):
         """Every chunk must have exactly one corresponding vector."""

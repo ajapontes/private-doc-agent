@@ -16,7 +16,7 @@ class RetrievalServiceTests(unittest.TestCase):
 
     @patch("app.services.retrieval_service.query_chunks")
     @patch("app.services.retrieval_service.embed_query")
-    def test_retrieval_returns_ranked_matches_with_similarity(
+    def test_retrieval_returns_ranked_matches_with_relevance(
         self, mock_embed_query, mock_query_chunks
     ):
         """Distances are converted into source-aware similarity results."""
@@ -29,14 +29,15 @@ class RetrievalServiceTests(unittest.TestCase):
                 "start_char": 0,
                 "end_char": 33,
                 "distance": 0.12,
+                "relevance_score": 0.88,
             }
         ]
 
         result = retrieve_relevant_chunks("  How is privacy protected?  ", top_k=2)
 
         self.assertEqual(result["question"], "How is privacy protected?")
-        self.assertEqual(result["matches"][0]["similarity"], 0.88)
-        self.assertNotIn("distance", result["matches"][0])
+        self.assertEqual(result["matches"][0]["relevance_score"], 0.88)
+        self.assertEqual(result["matches"][0]["distance"], 0.12)
         mock_embed_query.assert_called_once_with("How is privacy protected?")
         mock_query_chunks.assert_called_once_with(
             query_embedding=[0.8, 0.2], top_k=2

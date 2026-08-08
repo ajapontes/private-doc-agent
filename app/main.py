@@ -22,7 +22,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.config import APP_NAME, APP_VERSION, OLLAMA_MODEL
+from app.config import (
+    APP_NAME,
+    APP_VERSION,
+    CHROMA_COLLECTION_NAME,
+    OLLAMA_MODEL,
+    VECTOR_DISTANCE_METRIC,
+    VECTOR_SEARCH_TOP_K,
+)
 from app.logging_config import setup_logging, log_execution_separator
 from app.services.agent_service import (
     AgentExecutionError,
@@ -42,7 +49,11 @@ from app.services.retrieval_service import (
 )
 from app.services.simple_search import search_keyword
 from app.services.summarizer import summarize_document, SummarizerError
-from app.services.vector_store import close_vector_store
+from app.services.vector_store import (
+    VectorStoreError,
+    close_vector_store,
+    reset_vector_store,
+)
 
 
 setup_logging()
@@ -120,7 +131,7 @@ class RetrievalRequest(BaseModel):
     """
 
     question: str
-    top_k: int = 3
+    top_k: int = VECTOR_SEARCH_TOP_K
 
 
 class AskRequest(BaseModel):
@@ -133,7 +144,7 @@ class AskRequest(BaseModel):
     """
 
     question: str
-    top_k: int = 3
+    top_k: int = VECTOR_SEARCH_TOP_K
 
 
 class AgentRequest(BaseModel):
@@ -145,6 +156,17 @@ class AgentRequest(BaseModel):
     """
 
     request: str
+
+
+class VectorStoreResetRequest(BaseModel):
+    """Request model for the destructive vector-store reset operation.
+
+    Attributes:
+        confirm: Explicit authorization to delete all indexed chunks from the
+            configured vector collection.
+    """
+
+    confirm: bool = False
 
 
 @app.get("/health")
@@ -299,6 +321,55 @@ def retrieve_document_chunks(request: RetrievalRequest):
     )
 
     return result
+
+
+@app.post("/admin/vector-store/reset")
+def reset_configured_vector_store(request: VectorStoreResetRequest):
+    """Resets the configured vector collection after explicit confirmation."""
+    logger.warning(
+        "Vector store reset API request received. collection=%s metric=%s "
+        "confirmed=%s",
+        CHROMA_COLLECTION_NAME,
+        VECTOR_DISTANCE_METRIC,
+        request.confirm,
+    )
+
+    if request.confirm is not True:
+        logger.warning(
+            "Vector store reset API request rejected. collection=%s",
+            CHROMA_COLLECTION_NAME,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Vector store reset requires confirm=true.",
+        )
+
+    try:
+        deleted_records = reset_vector_store(confirm=True)
+    except VectorStoreError as error:
+        logger.error(
+            "Vector store reset API request failed. collection=%s metric=%s "
+            "error_type=%s",
+            CHROMA_COLLECTION_NAME,
+            VECTOR_DISTANCE_METRIC,
+            type(error).__name__,
+        )
+        raise HTTPException(status_code=500, detail=str(error))
+
+    logger.warning(
+        "Vector store reset API request completed. collection=%s metric=%s "
+        "deleted_records=%s",
+        CHROMA_COLLECTION_NAME,
+        VECTOR_DISTANCE_METRIC,
+        deleted_records,
+    )
+
+    return {
+        "status": "reset",
+        "collection": CHROMA_COLLECTION_NAME,
+        "metric": VECTOR_DISTANCE_METRIC,
+        "deleted_records": deleted_records,
+    }
 
 
 @app.post("/ask")

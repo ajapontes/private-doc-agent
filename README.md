@@ -4,7 +4,7 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 
 ## Current version
 
-`v0.4.0`
+`v0.6.0`
 
 ## Implemented capabilities
 
@@ -19,12 +19,16 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 - Semantic retrieval of relevant document chunks.
 - Retrieval-augmented generation (RAG) with traceable sources.
 - Grounded answers based on retrieved document evidence.
+- Single-step local agent execution through an allowlisted tool registry.
+- Configurable vector distance metric (`cosine`, `l2`, or `ip`).
+- Configurable retrieval result count and optional minimum relevance score.
+- Safe vector collection reset with explicit confirmation.
 - Controlled behavior when the available documents do not provide sufficient context.
 - Centralized console and rotating-file logging.
 - Separate local logging of complete LLM prompts and responses for debugging.
-- Automated tests for document loading, chunking, embeddings, vector storage, indexing, retrieval, RAG, API endpoints, and logging.
+- Automated tests for document loading, chunking, embeddings, vector storage, indexing, retrieval, RAG, agent execution, API endpoints, configuration, reset operations, and logging.
 
-Agents, MCP integrations, a frontend, and formats other than `.txt`, `.md`, `.pdf`, and `.docx` are not implemented in this version.
+Multi-step agent orchestration, MCP integrations, a frontend, and formats other than `.txt`, `.md`, `.pdf`, and `.docx` are not implemented in this version.
 
 ## Architecture
 
@@ -34,15 +38,13 @@ Client / Swagger
        v
     FastAPI
        |
-       +----------------------+-----------------------+
-       |                      |                       |
-       v                      v                       v
-Document operations    Indexing pipeline       RAG query pipeline
-list / read / search   load -> chunk            embed question
-summarize              -> embed -> ChromaDB     -> retrieve chunks
-                                               -> build prompt
-                                               -> Ollama answer
-                                               -> sources
+       +----------------+----------------+----------------+
+       |                |                |                |
+       v                v                v                v
+Document operations  Indexing/RAG    Local agent    Administration
+list/read/search     chunk/embed     plan request   confirm reset
+summarize            ChromaDB        select tool    recreate collection
+                     retrieve/ask    execute once   configured metric
 ```
 
 ### Main components
@@ -51,10 +53,13 @@ summarize              -> embed -> ChromaDB     -> retrieve chunks
 - **Document loader:** discovers supported files and extracts their text through a unified interface.
 - **Document chunker:** divides extracted text into overlapping fragments.
 - **Embedding service:** creates document and query embeddings through Ollama.
-- **ChromaDB vector store:** persists embeddings and document metadata locally.
+- **ChromaDB vector store:** persists embeddings and metadata locally using the configured distance metric.
 - **Indexing service:** coordinates loading, chunking, embedding generation, and storage.
 - **Retrieval service:** finds the chunks most closely related to a question.
 - **RAG service:** builds a grounded prompt, invokes the local model, and returns the answer with its sources.
+- **Tool registry and planner:** expose allowlisted local tools and select one tool for a request.
+- **Agent service:** validates the plan, executes one allowed tool, and returns a traceable result.
+- **Administrative reset:** safely recreates only the configured ChromaDB collection after explicit confirmation.
 - **Logging:** separates operational metadata from complete, potentially sensitive LLM interactions.
 
 ## Supported document formats
@@ -122,6 +127,18 @@ Review the values in `.env` and confirm that the required Ollama models are inst
 ollama list
 ```
 
+### Vector search configuration
+
+The following values can be configured in `.env`:
+
+| Variable | Default | Purpose |
+|---|---:|---|
+| `VECTOR_DISTANCE_METRIC` | `cosine` | ChromaDB distance metric: `cosine`, `l2`, or `ip`. |
+| `VECTOR_SEARCH_TOP_K` | `5` | Default maximum number of chunks returned by `/retrieve` and supplied to `/ask`. |
+| `VECTOR_MIN_RELEVANCE_SCORE` | empty | Optional normalized relevance threshold from `0` to `1`. |
+
+Changing `VECTOR_DISTANCE_METRIC` requires recreating the collection and reindexing the documents. Use the confirmed administrative reset endpoint described below; the application never removes the complete ChromaDB directory.
+
 ## Run the API
 
 Start the development server:
@@ -161,6 +178,8 @@ http://127.0.0.1:8000/redoc
 | `POST` | `/retrieve` | Retrieve semantically related chunks. |
 | `POST` | `/summarize` | Summarize one complete document. |
 | `POST` | `/ask` | Generate a grounded RAG answer with source metadata. |
+| `POST` | `/agent` | Plan and execute one allowlisted local tool. |
+| `POST` | `/admin/vector-store/reset` | Recreate the configured vector collection after explicit confirmation. |
 
 ### Health check
 
@@ -174,7 +193,7 @@ Example response:
 {
   "status": "ok",
   "app": "private-doc-agent",
-  "version": "0.4.0"
+  "version": "0.6.0"
 }
 ```
 
@@ -224,7 +243,7 @@ Performs a case-insensitive literal search over the available supported document
 POST /retrieve
 ```
 
-Semantic retrieval embeds the query and returns the most relevant indexed chunks with their document metadata and similarity values.
+Semantic retrieval embeds the query and returns the most relevant indexed chunks with document metadata, original distance, and normalized relevance score. Results use the configured metric, result count, and optional relevance threshold.
 
 Documents must be indexed before they can be retrieved semantically.
 
@@ -260,7 +279,8 @@ Example response:
     {
       "filename": "demo.pdf",
       "chunk_id": 0,
-      "similarity": 0.526988
+      "distance": 0.473012,
+      "relevance_score": 0.526988
     }
   ]
 }
@@ -271,6 +291,27 @@ If retrieval does not provide usable context, the API returns the controlled res
 ```text
 No sufficient information was found in the available documents.
 ```
+
+### Local agent
+
+```http
+POST /agent
+```
+
+The local agent uses a dedicated planner prompt to select one allowlisted tool, validates its arguments, executes it once, and returns the result with tool-use metadata. It does not run an autonomous multi-step loop.
+
+### Reset the vector collection
+
+```http
+POST /admin/vector-store/reset
+Content-Type: application/json
+
+{
+  "confirm": true
+}
+```
+
+The endpoint counts the stored chunks, deletes only the configured collection, and recreates it with the current distance metric. A missing or false confirmation is rejected with HTTP `400`. After a successful reset, index the documents again before using semantic retrieval or RAG.
 
 ## Local data and persistence
 
@@ -292,7 +333,7 @@ ChromaDB persists document chunks, embeddings, and related metadata locally. Thi
 
 ### Logs
 
-Operational application logs are written to the console and to rotating local log files. These logs record request flow, execution metadata, document operations, indexing, retrieval, and local LLM calls without storing complete document contents in the operational log.
+Operational application logs are written to the console and to rotating local log files. These logs record request flow, execution metadata, document operations, indexing, retrieval configuration, agent execution, vector reset events, and local LLM calls without storing complete document contents in the operational log.
 
 Complete LLM prompts and responses are written separately to:
 
@@ -321,7 +362,7 @@ Run the complete automated suite:
 python -m unittest discover -s tests -v
 ```
 
-The `v0.4.0` implementation contains 76 automated tests.
+The `v0.6.0` implementation contains 141 automated tests.
 
 The suite covers:
 
@@ -330,12 +371,17 @@ The suite covers:
 - Text chunking and overlap validation.
 - Ollama embedding requests.
 - ChromaDB storage and retrieval.
+- Vector metric selection and distance-to-relevance conversion.
+- Configurable result limits and minimum relevance filtering.
+- Confirmed vector collection reset through the service and API.
 - Single-document and bulk indexing.
 - Semantic retrieval.
 - RAG prompt construction and grounded answers.
 - Source metadata and no-context behavior.
 - Missing and empty Ollama responses.
 - API endpoints.
+- Tool registration, planning, local agent execution, and error handling.
+- Environment configuration validation.
 - Operational and LLM interaction logging.
 
 ## Implemented version history
@@ -386,16 +432,37 @@ The suite covers:
 - Additional LLM response metadata for local diagnostics.
 - Expanded automated test suite with 76 tests.
 
+### v0.5.0 - Local tool agent
+
+- Allowlisted local tool registry.
+- Dedicated tool-planning prompt and structured plan validation.
+- Single-step agent service with controlled execution and traceable tool metadata.
+- `POST /agent` endpoint and expanded error handling.
+- Expanded automated test suite with 115 tests.
+
+### v0.6.0 - Configurable vector search and safe reset
+
+- Environment-based ChromaDB collection and vector search settings.
+- Configurable `cosine`, `l2`, and `ip` distance metrics.
+- Normalized relevance scores while preserving original ChromaDB distances.
+- Configurable default `top_k` for retrieval and RAG.
+- Optional minimum relevance score filtering.
+- Safe collection reset requiring explicit confirmation.
+- Administrative `POST /admin/vector-store/reset` endpoint.
+- Privacy-aware operational logs for metric selection, retrieval, and reset events.
+- Expanded automated test suite with 141 tests.
+
 ## Current limitations
 
 - Only `.txt`, `.md`, `.pdf`, and `.docx` documents are supported.
 - Scanned PDFs without an embedded text layer require OCR, which is not implemented.
 - Summarization sends the complete extracted document text to the model.
 - Indexing must be triggered manually after adding or modifying documents.
-- Retrieval uses a fixed number of results; reranking and configurable similarity thresholds are not implemented.
+- Reranking is not implemented; ranking relies on the configured ChromaDB distance metric.
 - RAG source references identify files and chunks but do not expose PDF page numbers.
 - ChromaDB is intended for local, single-application use in this version.
-- There is no authentication, authorization, frontend, agent orchestration, or MCP server.
+- The administrative reset endpoint does not yet have authentication or authorization and must not be exposed to untrusted networks.
+- There is no frontend, multi-step agent orchestration, or MCP server.
 
 ## Privacy considerations
 

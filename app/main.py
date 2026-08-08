@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.config import APP_NAME, APP_VERSION, OLLAMA_MODEL
+from app.config import APP_NAME, APP_VERSION, OLLAMA_MODEL, VECTOR_SEARCH_TOP_K
 from app.logging_config import setup_logging, log_execution_separator
 from app.services.agent_service import (
     AgentExecutionError,
@@ -120,7 +120,7 @@ class RetrievalRequest(BaseModel):
     """
 
     question: str
-    top_k: int = 3
+    top_k: int = VECTOR_SEARCH_TOP_K
 
 
 class AskRequest(BaseModel):
@@ -133,7 +133,7 @@ class AskRequest(BaseModel):
     """
 
     question: str
-    top_k: int = 3
+    top_k: int = VECTOR_SEARCH_TOP_K
 
 
 class AgentRequest(BaseModel):

@@ -66,7 +66,7 @@ class RagApiTests(unittest.TestCase):
 
     @patch("app.main.answer_question")
     def test_ask_endpoint_uses_default_top_k(self, mock_answer):
-        """The endpoint requests three sources when top_k is omitted."""
+        """The endpoint requests configured number of sources when top_k is omitted."""
         mock_answer.return_value = self._service_result()
 
         with TestClient(app) as client:
@@ -78,7 +78,7 @@ class RagApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mock_answer.assert_called_once_with(
             question="What does the assistant do?",
-            top_k=3,
+            top_k=5,
         )
 
     @patch("app.main.answer_question")

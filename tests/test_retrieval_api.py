@@ -51,14 +51,14 @@ class RetrievalApiTests(unittest.TestCase):
 
     @patch("app.main.retrieve_relevant_chunks")
     def test_retrieval_endpoint_uses_default_top_k(self, mock_retrieve):
-        """The endpoint requests three matches when top_k is omitted."""
+        """The endpoint requests configured number of matches when top_k is omitted."""
         mock_retrieve.return_value = {"question": "Question", "matches": []}
 
         with TestClient(app) as client:
             response = client.post("/retrieve", json={"question": "Question"})
 
         self.assertEqual(response.status_code, 200)
-        mock_retrieve.assert_called_once_with(question="Question", top_k=3)
+        mock_retrieve.assert_called_once_with(question="Question", top_k=5)
 
     @patch("app.main.retrieve_relevant_chunks")
     def test_invalid_retrieval_request_returns_400(self, mock_retrieve):

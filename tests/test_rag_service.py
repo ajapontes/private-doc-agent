@@ -20,7 +20,8 @@ MATCHES = [
         "content": "Private Doc Agent is a local-first assistant.",
         "start_char": 0,
         "end_char": 45,
-        "similarity": 0.82,
+        "distance": 0.18,
+        "relevance_score": 0.82,
     },
     {
         "filename": "demo.md",
@@ -28,7 +29,8 @@ MATCHES = [
         "content": "It supports semantic document retrieval.",
         "start_char": 46,
         "end_char": 86,
-        "similarity": 0.71,
+        "distance": 0.29,
+        "relevance_score": 0.71,
     },
 ]
 
@@ -65,7 +67,12 @@ class RAGServiceTests(unittest.TestCase):
         self.assertEqual(len(result["sources"]), 2)
         self.assertEqual(
             result["sources"][0],
-            {"filename": "demo.txt", "chunk_id": 0, "similarity": 0.82},
+            {
+                "filename": "demo.txt",
+                "chunk_id": 0,
+                "distance": 0.18,
+                "relevance_score": 0.82,
+            },
         )
         self.assertNotIn("content", result["sources"][0])
         mock_retrieve.assert_called_once_with("  What does it do?  ", top_k=2)

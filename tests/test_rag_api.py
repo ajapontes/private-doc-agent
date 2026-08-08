@@ -28,7 +28,8 @@ class RagApiTests(unittest.TestCase):
                 {
                     "filename": "demo.txt",
                     "chunk_id": 0,
-                    "similarity": 0.81,
+                    "distance": 0.19,
+                    "relevance_score": 0.81,
                 }
             ],
         }

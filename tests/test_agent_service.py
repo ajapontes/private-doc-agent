@@ -144,6 +144,25 @@ class AgentServiceTests(unittest.TestCase):
         self.assertEqual(mock_plan.call_count, 1)
         self.assertEqual(self.handler.call_count, 1)
 
+    @patch("app.services.agent_service.plan_tool")
+    def test_detailed_trace_exposes_stages_without_request_content(self, mock_plan):
+        """Opt-in diagnostics show decisions and components without private text."""
+        mock_plan.return_value = ToolPlan(tool="list_documents", arguments={})
+        private_request = "CONFIDENTIAL list documents"
+
+        response = run_agent(
+            private_request,
+            self.registry,
+            detailed_trace=True,
+        ).to_dict()
+
+        self.assertEqual(
+            [event["stage"] for event in response["trace"]],
+            ["request", "planning", "decision", "execution", "result"],
+        )
+        self.assertIn("agent_service.run_agent", str(response["trace"]))
+        self.assertNotIn(private_request, str(response["trace"]))
+
 
 if __name__ == "__main__":
     unittest.main()

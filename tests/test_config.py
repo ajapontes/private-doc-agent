@@ -32,11 +32,20 @@ class ConfigurationTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             config = load_config()
 
-        self.assertEqual(config.APP_VERSION, "0.6.0")
+        self.assertEqual(config.APP_VERSION, "0.7.0")
         self.assertEqual(config.VECTOR_DISTANCE_METRIC, "cosine")
         self.assertEqual(config.VECTOR_SEARCH_TOP_K, 5)
         self.assertIsNone(config.VECTOR_MIN_RELEVANCE_SCORE)
         self.assertFalse(config.LOG_SENSITIVE_CONTENT)
+        self.assertFalse(config.DETAILED_TRACE_ENABLED)
+
+    def test_detailed_trace_requires_boolean_value(self):
+        """Detailed tracing accepts only an explicit true or false value."""
+        with patch.dict(
+            os.environ, {"DETAILED_TRACE_ENABLED": "yes"}, clear=True
+        ):
+            with self.assertRaisesRegex(ValueError, "true or false"):
+                load_config()
 
     def test_supported_vector_metric_is_normalized(self):
         """A supported metric is accepted regardless of case or whitespace."""

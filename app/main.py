@@ -217,8 +217,10 @@ def index_available_documents():
         raise HTTPException(status_code=500, detail=str(error))
 
     logger.info(
-        "Bulk document indexing completed. documents_indexed=%s chunks_indexed=%s",
+        "Bulk document indexing completed. documents_indexed=%s "
+        "documents_invalid=%s chunks_indexed=%s",
         result["documents_indexed"],
+        result.get("documents_invalid", 0),
         result["chunks_indexed"],
     )
 

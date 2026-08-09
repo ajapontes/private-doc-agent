@@ -17,6 +17,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from app.config import DETAILED_TRACE_ENABLED
 from app.services.tool_planner import ToolPlan, ToolPlannerError, plan_tool
 from app.services.tool_registry import (
     ToolRegistry,
@@ -46,25 +47,51 @@ class AgentResult:
 
     plan: ToolPlan
     result: Any
+    trace: tuple[dict, ...] = ()
 
     def to_dict(self) -> dict:
         """Returns the public response contract for the future API endpoint."""
-        return {
+        response = {
             "plan": self.plan.to_dict(),
             "tools_used": [self.plan.tool],
             "result": self.result,
         }
+        if self.trace:
+            response["trace"] = list(self.trace)
+        return response
+
+
+def _trace_event(stage: str, component: str, action: str, **details: Any) -> dict:
+    """Builds one content-safe structured diagnostic event."""
+    return {
+        "stage": stage,
+        "component": component,
+        "action": action,
+        "details": details,
+    }
 
 
 def run_agent(
     user_request: str,
     registry: ToolRegistry = tool_registry,
+    detailed_trace: bool = DETAILED_TRACE_ENABLED,
 ) -> AgentResult:
     """Plans and executes exactly one allowlisted tool for a user request."""
     if not isinstance(user_request, str) or not user_request.strip():
         raise ValueError("User request cannot be empty.")
     if not isinstance(registry, ToolRegistry):
         raise TypeError("registry must be a ToolRegistry.")
+
+    trace = []
+    if detailed_trace:
+        trace.append(
+            _trace_event(
+                "request",
+                "agent_service.run_agent",
+                "validate_request",
+                request_length=len(user_request.strip()),
+            )
+        )
 
     logger.info(
         "Starting local agent execution. request_length=%s available_tools=%s",
@@ -73,6 +100,15 @@ def run_agent(
     )
 
     try:
+        if detailed_trace:
+            trace.append(
+                _trace_event(
+                    "planning",
+                    "tool_planner.plan_tool",
+                    "select_allowlisted_tool",
+                    available_tools=len(registry.list_tools()),
+                )
+            )
         plan = plan_tool(user_request.strip(), registry)
     except ToolPlannerError as error:
         logger.warning("Local agent planning failed. error_type=%s", type(error).__name__)
@@ -83,8 +119,27 @@ def run_agent(
         plan.tool,
         sorted(plan.arguments),
     )
+    if detailed_trace:
+        trace.append(
+            _trace_event(
+                "decision",
+                "tool_planner.plan_tool",
+                "tool_plan_validated",
+                tool=plan.tool,
+                argument_names=sorted(plan.arguments),
+            )
+        )
 
     try:
+        if detailed_trace:
+            trace.append(
+                _trace_event(
+                    "execution",
+                    "tool_registry.ToolRegistry.execute",
+                    "execute_tool",
+                    tool=plan.tool,
+                )
+            )
         result = registry.execute(plan.tool, plan.arguments)
     except ToolRegistryError as error:
         logger.warning(
@@ -96,5 +151,17 @@ def run_agent(
             f"Unable to execute planned tool '{plan.tool}': {error}"
         ) from error
 
+    if detailed_trace:
+        trace.append(
+            _trace_event(
+                "result",
+                "agent_service.run_agent",
+                "execution_completed",
+                tool=plan.tool,
+                result_type=type(result).__name__,
+            )
+        )
+        logger.debug("Detailed agent trace generated. events=%s", len(trace))
+
     logger.info("Local agent execution completed. tool=%s", plan.tool)
-    return AgentResult(plan=plan, result=result)
+    return AgentResult(plan=plan, result=result, trace=tuple(trace))

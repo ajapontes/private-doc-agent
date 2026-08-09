@@ -19,7 +19,7 @@ import logging
 
 from app.config import EMBEDDING_BATCH_SIZE, OLLAMA_EMBEDDING_MODEL
 from app.services.document_chunker import chunk_document
-from app.services.document_loader import list_documents
+from app.services.document_loader import list_documents, move_document_to_invalid
 from app.services.embedding_service import EmbeddingServiceError, embed_documents
 from app.services.vector_store import (
     VectorStoreError,
@@ -33,6 +33,12 @@ logger = logging.getLogger(__name__)
 
 class IndexingServiceError(Exception):
     """Raised when a document cannot complete the local indexing workflow."""
+
+    pass
+
+
+class InvalidDocumentError(IndexingServiceError):
+    """Raised when a document itself has no content that can be indexed."""
 
     pass
 
@@ -97,7 +103,7 @@ def index_document(filename: str) -> dict:
         chunks = chunk_document(filename)
 
         if not chunks:
-            raise IndexingServiceError(
+            raise InvalidDocumentError(
                 f"Document does not contain indexable text: {filename}"
             )
 
@@ -145,25 +151,60 @@ def index_all_documents() -> dict:
         Aggregate counts and the individual result for every document.
 
     Raises:
-        IndexingServiceError: If no supported documents are available or one
-            of the documents cannot be indexed.
+        IndexingServiceError: If no supported documents are available or an
+            infrastructure failure prevents indexing from continuing.
     """
     documents = list_documents()
 
     if not documents:
         raise IndexingServiceError("No supported documents are available to index.")
 
-    results = [index_document(document["filename"]) for document in documents]
+    results = []
+    invalid_documents = []
+
+    for document in documents:
+        filename = document["filename"]
+        try:
+            results.append(index_document(filename))
+        except (ValueError, InvalidDocumentError) as error:
+            logger.warning(
+                "Invalid document detected during bulk indexing. "
+                "filename=%s error_type=%s",
+                filename,
+                type(error).__name__,
+            )
+            try:
+                moved = move_document_to_invalid(filename)
+                moved["error"] = str(error)
+                invalid_documents.append(moved)
+            except OSError as move_error:
+                logger.error(
+                    "Invalid document could not be moved. filename=%s "
+                    "error_type=%s",
+                    filename,
+                    type(move_error).__name__,
+                )
+                invalid_documents.append(
+                    {
+                        "filename": filename,
+                        "error": str(error),
+                        "move_error": str(move_error),
+                    }
+                )
 
     aggregate = {
         "documents_indexed": len(results),
         "chunks_indexed": sum(result["chunks_indexed"] for result in results),
         "documents": results,
+        "documents_invalid": len(invalid_documents),
+        "invalid_documents": invalid_documents,
     }
 
     logger.info(
-        "All documents indexed. documents_indexed=%s chunks_indexed=%s",
+        "All documents processed. documents_indexed=%s documents_invalid=%s "
+        "chunks_indexed=%s",
         aggregate["documents_indexed"],
+        aggregate["documents_invalid"],
         aggregate["chunks_indexed"],
     )
 

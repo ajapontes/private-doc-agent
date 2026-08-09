@@ -12,6 +12,7 @@ data/input/*
 !data/input/demo.txt
 
 data/processed/
+data/invalid/
 data/chroma/
 logs/
 *.log

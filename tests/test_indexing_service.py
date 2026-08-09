@@ -144,7 +144,59 @@ class IndexingServiceTests(unittest.TestCase):
 
         self.assertEqual(result["documents_indexed"], 2)
         self.assertEqual(result["chunks_indexed"], 5)
+        self.assertEqual(result["documents_invalid"], 0)
         self.assertEqual(mock_index_document.call_args_list, [call("first.md"), call("second.txt")])
+
+    @patch("app.services.indexing_service.move_document_to_invalid")
+    @patch("app.services.indexing_service.index_document")
+    @patch("app.services.indexing_service.list_documents")
+    def test_invalid_document_is_moved_and_remaining_documents_continue(
+        self,
+        mock_list_documents,
+        mock_index_document,
+        mock_move_document,
+    ):
+        """A bad document is quarantined without cancelling bulk indexing."""
+        mock_list_documents.return_value = [
+            {"filename": "broken.pdf"},
+            {"filename": "valid.md"},
+        ]
+        mock_index_document.side_effect = [
+            ValueError("Unable to read PDF document: broken.pdf"),
+            {"filename": "valid.md", "chunks_indexed": 2},
+        ]
+        mock_move_document.return_value = {
+            "filename": "broken.pdf",
+            "invalid_path": "data/invalid/broken.pdf",
+        }
+
+        result = index_all_documents()
+
+        self.assertEqual(result["documents_indexed"], 1)
+        self.assertEqual(result["documents_invalid"], 1)
+        self.assertEqual(result["chunks_indexed"], 2)
+        mock_move_document.assert_called_once_with("broken.pdf")
+        self.assertIn("Unable to read PDF", result["invalid_documents"][0]["error"])
+
+    @patch("app.services.indexing_service.move_document_to_invalid")
+    @patch("app.services.indexing_service.index_document")
+    @patch("app.services.indexing_service.list_documents")
+    def test_infrastructure_failure_stops_without_moving_document(
+        self,
+        mock_list_documents,
+        mock_index_document,
+        mock_move_document,
+    ):
+        """Ollama or vector failures must not quarantine a valid document."""
+        mock_list_documents.return_value = [{"filename": "valid.md"}]
+        mock_index_document.side_effect = IndexingServiceError(
+            "Unable to index document: Ollama unavailable"
+        )
+
+        with self.assertRaisesRegex(IndexingServiceError, "Ollama unavailable"):
+            index_all_documents()
+
+        mock_move_document.assert_not_called()
 
     @patch("app.services.indexing_service.list_documents", return_value=[])
     def test_bulk_indexing_requires_documents(self, _mock_list_documents):

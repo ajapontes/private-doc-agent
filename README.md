@@ -4,7 +4,9 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 
 ## Current version
 
-`v0.6.0`
+`v0.7.0`
+
+Documentation is also available in [Spanish](README_ES.md).
 
 ## Implemented capabilities
 
@@ -16,6 +18,7 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 - Local document and query embeddings through Ollama.
 - Persistent local vector storage with ChromaDB.
 - Indexing of one document or all supported documents.
+- Resilient bulk indexing that quarantines invalid documents in `data/invalid/` and continues processing valid files.
 - Semantic retrieval of relevant document chunks.
 - Retrieval-augmented generation (RAG) with traceable sources.
 - Grounded answers based on retrieved document evidence.
@@ -26,6 +29,7 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 - Controlled behavior when the available documents do not provide sufficient context.
 - Centralized console and rotating-file logging.
 - Separate local logging of complete LLM prompts and responses for debugging.
+- Optional structured agent trace showing stages, components, tool decisions, and execution metadata without request or document content.
 - Automated tests for document loading, chunking, embeddings, vector storage, indexing, retrieval, RAG, agent execution, API endpoints, configuration, reset operations, and logging.
 
 Multi-step agent orchestration, MCP integrations, a frontend, and formats other than `.txt`, `.md`, `.pdf`, and `.docx` are not implemented in this version.
@@ -136,6 +140,7 @@ The following values can be configured in `.env`:
 | `VECTOR_DISTANCE_METRIC` | `cosine` | ChromaDB distance metric: `cosine`, `l2`, or `ip`. |
 | `VECTOR_SEARCH_TOP_K` | `5` | Default maximum number of chunks returned by `/retrieve` and supplied to `/ask`. |
 | `VECTOR_MIN_RELEVANCE_SCORE` | empty | Optional normalized relevance threshold from `0` to `1`. |
+| `DETAILED_TRACE_ENABLED` | `false` | Include a content-safe structured execution trace in successful `/agent` responses. |
 
 Changing `VECTOR_DISTANCE_METRIC` requires recreating the collection and reindexing the documents. Use the confirmed administrative reset endpoint described below; the application never removes the complete ChromaDB directory.
 
@@ -219,7 +224,7 @@ The document loader extracts and returns text using the appropriate reader for i
 POST /documents/index
 ```
 
-The response reports the documents and chunks indexed, together with embedding information produced by the indexing process.
+The response reports indexed and invalid document counts, quarantined files, chunks, and embedding information. An unreadable or empty document is moved to `data/invalid/`; remaining valid documents continue processing. Infrastructure failures such as an unavailable Ollama or ChromaDB service still stop the operation so valid documents are not misclassified.
 
 ### Index one document
 
@@ -300,6 +305,8 @@ POST /agent
 
 The local agent uses a dedicated planner prompt to select one allowlisted tool, validates its arguments, executes it once, and returns the result with tool-use metadata. It does not run an autonomous multi-step loop.
 
+Set `DETAILED_TRACE_ENABLED=true` to include a `trace` array in successful responses. The trace identifies the request-validation, planning, decision, execution, and result stages together with the responsible function or component. It records only safe metadata such as lengths, tool names, argument names, and result types; it does not include the user request, document content, prompts, or tool results.
+
 ### Reset the vector collection
 
 ```http
@@ -330,6 +337,14 @@ data/chroma/
 ```
 
 ChromaDB persists document chunks, embeddings, and related metadata locally. This directory is not committed to Git.
+
+### Invalid documents
+
+```text
+data/invalid/
+```
+
+Bulk indexing moves unreadable, damaged, encrypted, or empty documents to this local quarantine directory. Existing files are preserved by adding a numeric suffix to name collisions. The directory is excluded from Git.
 
 ### Logs
 
@@ -362,7 +377,7 @@ Run the complete automated suite:
 python -m unittest discover -s tests -v
 ```
 
-The `v0.6.0` implementation contains 141 automated tests.
+The `v0.7.0` implementation contains 146 automated tests, including resilient-ingestion, quarantine, and detailed-trace coverage.
 
 The suite covers:
 
@@ -451,6 +466,15 @@ The suite covers:
 - Administrative `POST /admin/vector-store/reset` endpoint.
 - Privacy-aware operational logs for metric selection, retrieval, and reset events.
 - Expanded automated test suite with 141 tests.
+
+### v0.7.0 - Resilient ingestion and detailed diagnostics
+
+- Invalid documents are moved to `data/invalid/` during bulk indexing.
+- Valid documents continue indexing after a document-level failure.
+- Infrastructure failures remain blocking and do not quarantine valid files.
+- Optional structured trace for local-agent request, planning, decision, execution, and result stages.
+- English and Spanish repository documentation maintained together.
+- Privacy-aware logs and automated coverage for the new workflows.
 
 ## Current limitations
 

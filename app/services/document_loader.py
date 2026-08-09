@@ -20,15 +20,48 @@ Logging strategy:
 """
 
 import logging
+import shutil
 from pathlib import Path
 
 from docx import Document
 from pypdf import PdfReader
 
-from app.config import INPUT_DIR, SUPPORTED_EXTENSIONS
+from app.config import INPUT_DIR, INVALID_DIR, SUPPORTED_EXTENSIONS
 
 
 logger = logging.getLogger(__name__)
+
+
+def move_document_to_invalid(filename: str) -> dict:
+    """Moves an unreadable input document to the local quarantine directory.
+
+    Existing quarantined files are never overwritten. A numeric suffix is
+    added when a file with the same name already exists.
+    """
+    if Path(filename).name != filename:
+        raise ValueError("filename must not include a directory path")
+
+    source_path = INPUT_DIR / filename
+    if not source_path.exists() or not source_path.is_file():
+        raise FileNotFoundError(f"Document not found: {filename}")
+
+    INVALID_DIR.mkdir(parents=True, exist_ok=True)
+    destination_path = INVALID_DIR / source_path.name
+    counter = 1
+    while destination_path.exists():
+        destination_path = INVALID_DIR / (
+            f"{source_path.stem}_{counter}{source_path.suffix}"
+        )
+        counter += 1
+
+    shutil.move(str(source_path), str(destination_path))
+    relative_path = str(destination_path.relative_to(INPUT_DIR.parent.parent))
+    logger.warning(
+        "Invalid document moved to quarantine. filename=%s destination=%s",
+        filename,
+        relative_path,
+    )
+    return {"filename": filename, "invalid_path": relative_path}
 
 
 def list_documents() -> list[dict]:

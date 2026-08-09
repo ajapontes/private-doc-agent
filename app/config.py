@@ -72,13 +72,14 @@ def _get_required_text(variable_name: str, default: str) -> str:
 
 # Application metadata
 APP_NAME = "private-doc-agent"
-APP_VERSION = "0.6.0"
+APP_VERSION = "0.7.0"
 
 
 # Base project paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 INPUT_DIR = DATA_DIR / "input"
+INVALID_DIR = DATA_DIR / "invalid"
 CHROMA_DIR = DATA_DIR / "chroma"
 
 
@@ -124,3 +125,4 @@ VECTOR_MIN_RELEVANCE_SCORE = _get_optional_float(
 
 # Logging and controlled diagnostics configuration
 LOG_SENSITIVE_CONTENT = _get_bool("LOG_SENSITIVE_CONTENT", False)
+DETAILED_TRACE_ENABLED = _get_bool("DETAILED_TRACE_ENABLED", False)

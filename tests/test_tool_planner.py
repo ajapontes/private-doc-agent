@@ -67,6 +67,30 @@ class ToolPlannerTests(unittest.TestCase):
         self.assertEqual(plan.arguments, {})
 
     @patch("app.services.tool_planner.generate_text")
+    def test_missing_arguments_key_is_normalized_for_no_argument_tool(
+        self,
+        mock_generate,
+    ):
+        """A missing arguments key becomes empty for a no-argument tool."""
+        mock_generate.return_value = '{"tool": "list_documents"}'
+
+        plan = plan_tool("What documents are available?")
+
+        self.assertEqual(plan.tool, "list_documents")
+        self.assertEqual(plan.arguments, {})
+
+    @patch("app.services.tool_planner.generate_text")
+    def test_missing_arguments_key_does_not_bypass_required_arguments(
+        self,
+        mock_generate,
+    ):
+        """Normalization does not bypass required tool arguments."""
+        mock_generate.return_value = '{"tool": "read_document"}'
+
+        with self.assertRaisesRegex(InvalidToolPlanError, "filename"):
+            plan_tool("Read a document")
+
+    @patch("app.services.tool_planner.generate_text")
     def test_invalid_json_is_rejected(self, mock_generate):
         """Markdown or explanatory text is not silently extracted."""
         mock_generate.return_value = (

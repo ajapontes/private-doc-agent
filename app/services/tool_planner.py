@@ -99,11 +99,13 @@ def _parse_model_response(response: str) -> dict:
     if not isinstance(plan, dict):
         raise InvalidToolPlanError("The tool plan must be a JSON object.")
 
-    expected_keys = {"tool", "arguments"}
+    required_keys = {"tool"}
+    allowed_keys = {"tool", "arguments"}
     actual_keys = set(plan)
-    if actual_keys != expected_keys:
-        missing = sorted(expected_keys - actual_keys)
-        unexpected = sorted(actual_keys - expected_keys)
+
+    missing = sorted(required_keys - actual_keys)
+    unexpected = sorted(actual_keys - allowed_keys)
+    if missing or unexpected:
         details = []
         if missing:
             details.append(f"missing keys: {', '.join(missing)}")
@@ -112,6 +114,8 @@ def _parse_model_response(response: str) -> dict:
         raise InvalidToolPlanError(
             f"The tool plan has an invalid structure ({'; '.join(details)})."
         )
+
+    plan.setdefault("arguments", {})
 
     if not isinstance(plan["tool"], str) or not plan["tool"].strip():
         raise InvalidToolPlanError("The tool plan must include a valid tool name.")

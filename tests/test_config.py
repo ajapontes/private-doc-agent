@@ -17,10 +17,16 @@ CONFIG_PATH = Path(__file__).resolve().parent.parent / "app" / "config.py"
 
 
 def load_config():
-    """Loads an isolated configuration module from the project source file."""
-    spec = importlib.util.spec_from_file_location("test_runtime_config", CONFIG_PATH)
+    """Loads an isolated configuration module without reading the local .env."""
+    spec = importlib.util.spec_from_file_location(
+        "test_runtime_config",
+        CONFIG_PATH,
+    )
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+
+    with patch("dotenv.load_dotenv"):
+        spec.loader.exec_module(module)
+
     return module
 
 

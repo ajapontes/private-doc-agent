@@ -124,10 +124,12 @@ class IndexingServiceTests(unittest.TestCase):
             index_document("missing.md")
 
     @patch("app.services.indexing_service.index_document")
+    @patch("app.services.indexing_service.list_unsupported_documents", return_value=[])
     @patch("app.services.indexing_service.list_documents")
     def test_all_documents_are_indexed_and_aggregated(
         self,
         mock_list_documents,
+        _mock_list_unsupported_documents,
         mock_index_document,
     ):
         """Bulk indexing returns document and chunk totals."""
@@ -149,10 +151,12 @@ class IndexingServiceTests(unittest.TestCase):
 
     @patch("app.services.indexing_service.move_document_to_invalid")
     @patch("app.services.indexing_service.index_document")
+    @patch("app.services.indexing_service.list_unsupported_documents", return_value=[])
     @patch("app.services.indexing_service.list_documents")
     def test_invalid_document_is_moved_and_remaining_documents_continue(
         self,
         mock_list_documents,
+        _mock_list_unsupported_documents,
         mock_index_document,
         mock_move_document,
     ):
@@ -180,10 +184,12 @@ class IndexingServiceTests(unittest.TestCase):
 
     @patch("app.services.indexing_service.move_document_to_invalid")
     @patch("app.services.indexing_service.index_document")
+    @patch("app.services.indexing_service.list_unsupported_documents", return_value=[])
     @patch("app.services.indexing_service.list_documents")
     def test_infrastructure_failure_stops_without_moving_document(
         self,
         mock_list_documents,
+        _mock_list_unsupported_documents,
         mock_index_document,
         mock_move_document,
     ):
@@ -198,11 +204,46 @@ class IndexingServiceTests(unittest.TestCase):
 
         mock_move_document.assert_not_called()
 
+    @patch("app.services.indexing_service.list_unsupported_documents", return_value=[])
     @patch("app.services.indexing_service.list_documents", return_value=[])
-    def test_bulk_indexing_requires_documents(self, _mock_list_documents):
+    def test_bulk_indexing_requires_documents(
+        self, _mock_list_documents, _mock_list_unsupported_documents
+    ):
         """Bulk indexing reports when the input directory has no documents."""
         with self.assertRaisesRegex(IndexingServiceError, "No supported documents"):
             index_all_documents()
+
+    @patch("app.services.indexing_service.move_document_to_invalid")
+    @patch("app.services.indexing_service.index_document")
+    @patch("app.services.indexing_service.list_unsupported_documents")
+    @patch("app.services.indexing_service.list_documents", return_value=[])
+    def test_unsupported_document_is_moved_without_supported_documents(
+        self,
+        _mock_list_documents,
+        mock_list_unsupported_documents,
+        mock_index_document,
+        mock_move_document,
+    ):
+        """An XLSX-only input folder is processed and quarantined successfully."""
+        mock_list_unsupported_documents.return_value = [
+            {"filename": "workbook.xlsx", "extension": ".xlsx"}
+        ]
+        mock_move_document.return_value = {
+            "filename": "workbook.xlsx",
+            "invalid_path": "data/invalid/workbook.xlsx",
+        }
+
+        result = index_all_documents()
+
+        self.assertEqual(result["documents_indexed"], 0)
+        self.assertEqual(result["documents_invalid"], 1)
+        self.assertEqual(result["chunks_indexed"], 0)
+        self.assertEqual(
+            result["invalid_documents"][0]["error"],
+            "Unsupported file extension: .xlsx",
+        )
+        mock_move_document.assert_called_once_with("workbook.xlsx")
+        mock_index_document.assert_not_called()
 
 
 if __name__ == "__main__":

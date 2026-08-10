@@ -107,6 +107,35 @@ def list_documents() -> list[dict]:
     return documents
 
 
+def list_unsupported_documents() -> list[dict]:
+    """Lists regular input files whose extensions are not supported.
+
+    These files are discovered separately from supported documents so bulk
+    indexing can move them to quarantine instead of silently ignoring them.
+    """
+    INPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    documents = []
+    for file_path in INPUT_DIR.iterdir():
+        if file_path.is_file() and file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            document_metadata = {
+                "filename": file_path.name,
+                "extension": file_path.suffix.lower(),
+                "size_bytes": file_path.stat().st_size,
+                "path": str(file_path.relative_to(INPUT_DIR.parent.parent)),
+            }
+            documents.append(document_metadata)
+            logger.warning(
+                "Unsupported document found. filename=%s extension=%s size_bytes=%s",
+                document_metadata["filename"],
+                document_metadata["extension"],
+                document_metadata["size_bytes"],
+            )
+
+    logger.info("Unsupported document scan completed. count=%s", len(documents))
+    return documents
+
+
 def _read_text_document(file_path: Path) -> str:
     """
     Reads a UTF-8 plain-text or Markdown document.

@@ -51,6 +51,22 @@ class DocumentLoaderTests(unittest.TestCase):
             {"notes.txt", "guide.md", "report.pdf", "contract.docx"},
         )
 
+    def test_list_unsupported_documents_returns_invalid_formats(self):
+        """Unsupported files are exposed for bulk-index quarantine."""
+        (self.input_directory / "notes.txt").write_text("Text", encoding="utf-8")
+        (self.input_directory / "workbook.xlsx").write_bytes(b"xlsx")
+        (self.input_directory / "README").write_text("no extension", encoding="utf-8")
+
+        documents = document_loader.list_unsupported_documents()
+
+        self.assertEqual(
+            {document["filename"] for document in documents},
+            {"workbook.xlsx", "README"},
+        )
+        extensions = {document["filename"]: document["extension"] for document in documents}
+        self.assertEqual(extensions["workbook.xlsx"], ".xlsx")
+        self.assertEqual(extensions["README"], "")
+
     def test_text_document_is_read_as_utf8(self):
         """UTF-8 TXT content is returned without modification."""
         file_path = self.input_directory / "notes.txt"

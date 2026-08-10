@@ -19,7 +19,11 @@ import logging
 
 from app.config import EMBEDDING_BATCH_SIZE, OLLAMA_EMBEDDING_MODEL
 from app.services.document_chunker import chunk_document
-from app.services.document_loader import list_documents, move_document_to_invalid
+from app.services.document_loader import (
+    list_documents,
+    list_unsupported_documents,
+    move_document_to_invalid,
+)
 from app.services.embedding_service import EmbeddingServiceError, embed_documents
 from app.services.vector_store import (
     VectorStoreError,
@@ -155,12 +159,42 @@ def index_all_documents() -> dict:
             infrastructure failure prevents indexing from continuing.
     """
     documents = list_documents()
+    unsupported_documents = list_unsupported_documents()
 
-    if not documents:
+    if not documents and not unsupported_documents:
         raise IndexingServiceError("No supported documents are available to index.")
 
     results = []
     invalid_documents = []
+
+    for document in unsupported_documents:
+        filename = document["filename"]
+        extension = document["extension"] or "<none>"
+        error = f"Unsupported file extension: {extension}"
+        logger.warning(
+            "Unsupported document detected during bulk indexing. "
+            "filename=%s extension=%s",
+            filename,
+            extension,
+        )
+        try:
+            moved = move_document_to_invalid(filename)
+            moved["error"] = error
+            invalid_documents.append(moved)
+        except OSError as move_error:
+            logger.error(
+                "Unsupported document could not be moved. filename=%s "
+                "error_type=%s",
+                filename,
+                type(move_error).__name__,
+            )
+            invalid_documents.append(
+                {
+                    "filename": filename,
+                    "error": error,
+                    "move_error": str(move_error),
+                }
+            )
 
     for document in documents:
         filename = document["filename"]

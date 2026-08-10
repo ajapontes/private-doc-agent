@@ -366,6 +366,48 @@ def delete_document_chunks(filename: str) -> None:
     logger.info("Stored document chunks deleted. filename=%s", filename)
 
 
+def delete_stale_document_chunks(filename: str, active_chunk_ids: set[int]) -> int:
+    """Deletes only obsolete chunks after a successful document upsert.
+
+    New and unchanged records remain available if persistence fails before this
+    cleanup step. This makes reindexing safer than deleting the complete source
+    document before writing its replacement.
+    """
+    if not filename or not filename.strip():
+        raise VectorStoreError("Filename cannot be empty.")
+
+    try:
+        collection = get_collection()
+        stored = collection.get(where={"filename": filename}, include=["metadatas"])
+        stale_ids = [
+            record_id
+            for record_id, metadata in zip(
+                stored.get("ids", []), stored.get("metadatas", [])
+            )
+            if metadata.get("chunk_id") not in active_chunk_ids
+        ]
+        if stale_ids:
+            collection.delete(ids=stale_ids)
+    except VectorStoreError:
+        raise
+    except Exception as error:
+        logger.error(
+            "Unable to delete stale document chunks. filename=%s error=%s",
+            filename,
+            error,
+        )
+        raise VectorStoreError(
+            f"Unable to delete stale document chunks: {error}"
+        ) from error
+
+    logger.info(
+        "Stale document chunks deleted. filename=%s deleted_records=%s",
+        filename,
+        len(stale_ids),
+    )
+    return len(stale_ids)
+
+
 def count_stored_chunks() -> int:
     """Returns the number of chunk records in the local collection."""
     try:

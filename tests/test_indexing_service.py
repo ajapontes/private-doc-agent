@@ -11,6 +11,7 @@ from unittest.mock import call, patch
 
 from app.services.embedding_service import EmbeddingServiceError
 from app.services.indexing_service import (
+    IndexingInfrastructureError,
     IndexingServiceError,
     index_all_documents,
     index_document,
@@ -31,16 +32,16 @@ def _chunk(chunk_id: int, content: str) -> dict:
 class IndexingServiceTests(unittest.TestCase):
     """Validates the complete indexing orchestration without external calls."""
 
+    @patch("app.services.indexing_service.delete_stale_document_chunks")
     @patch("app.services.indexing_service.upsert_chunks")
-    @patch("app.services.indexing_service.delete_document_chunks")
     @patch("app.services.indexing_service.embed_documents")
     @patch("app.services.indexing_service.chunk_document")
     def test_document_is_chunked_embedded_and_persisted(
         self,
         mock_chunk_document,
         mock_embed_documents,
-        mock_delete_document_chunks,
         mock_upsert_chunks,
+        mock_delete_stale_chunks,
     ):
         """One document flows through every indexing stage successfully."""
         chunks = [_chunk(0, "first"), _chunk(1, "second")]
@@ -53,14 +54,14 @@ class IndexingServiceTests(unittest.TestCase):
 
         mock_chunk_document.assert_called_once_with("demo.md")
         mock_embed_documents.assert_called_once_with(["first", "second"])
-        mock_delete_document_chunks.assert_called_once_with("demo.md")
         mock_upsert_chunks.assert_called_once_with(chunks, embeddings)
+        mock_delete_stale_chunks.assert_called_once_with("demo.md", {0, 1})
         self.assertEqual(result["filename"], "demo.md")
         self.assertEqual(result["chunks_indexed"], 2)
         self.assertEqual(result["vector_dimension"], 2)
 
     @patch("app.services.indexing_service.upsert_chunks", return_value=3)
-    @patch("app.services.indexing_service.delete_document_chunks")
+    @patch("app.services.indexing_service.delete_stale_document_chunks")
     @patch("app.services.indexing_service.embed_documents")
     @patch("app.services.indexing_service.chunk_document")
     @patch("app.services.indexing_service.EMBEDDING_BATCH_SIZE", 2)
@@ -68,8 +69,8 @@ class IndexingServiceTests(unittest.TestCase):
         self,
         mock_chunk_document,
         mock_embed_documents,
-        _mock_delete,
         _mock_upsert,
+        _mock_delete_stale,
     ):
         """Longer documents are sent to Ollama in bounded batches."""
         chunks = [
@@ -91,14 +92,14 @@ class IndexingServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["chunks_indexed"], 3)
 
-    @patch("app.services.indexing_service.delete_document_chunks")
+    @patch("app.services.indexing_service.delete_stale_document_chunks")
     @patch("app.services.indexing_service.embed_documents")
     @patch("app.services.indexing_service.chunk_document")
     def test_embedding_failure_preserves_previous_index(
         self,
         mock_chunk_document,
         mock_embed_documents,
-        mock_delete_document_chunks,
+        mock_delete_stale_chunks,
     ):
         """Old records are not deleted when new embeddings cannot be created."""
         mock_chunk_document.return_value = [_chunk(0, "content")]
@@ -107,7 +108,28 @@ class IndexingServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(IndexingServiceError, "Ollama unavailable"):
             index_document("demo.md")
 
-        mock_delete_document_chunks.assert_not_called()
+        mock_delete_stale_chunks.assert_not_called()
+
+    @patch("app.services.indexing_service.delete_stale_document_chunks")
+    @patch("app.services.indexing_service.upsert_chunks")
+    @patch("app.services.indexing_service.embed_documents")
+    @patch("app.services.indexing_service.chunk_document")
+    def test_persistence_failure_is_classified_as_infrastructure_error(
+        self, mock_chunk, mock_embed, mock_upsert, mock_cleanup
+    ):
+        """ChromaDB failures are distinct from invalid source documents."""
+        from app.services.vector_store import VectorStoreError
+
+        mock_chunk.return_value = [_chunk(0, "content")]
+        mock_embed.return_value = [[1.0, 0.0]]
+        mock_upsert.side_effect = VectorStoreError("ChromaDB unavailable")
+
+        with self.assertRaisesRegex(
+            IndexingInfrastructureError, "ChromaDB unavailable"
+        ):
+            index_document("demo.md")
+
+        mock_cleanup.assert_not_called()
 
     @patch("app.services.indexing_service.chunk_document", return_value=[])
     def test_empty_document_is_rejected(self, _mock_chunk_document):

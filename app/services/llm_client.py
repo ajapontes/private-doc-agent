@@ -21,6 +21,7 @@ import requests
 
 from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
 from app.logging_config import log_llm_interaction
+from app.services.ollama_transport import OllamaTransportError, post_json
 
 logger = logging.getLogger(__name__)
 
@@ -71,23 +72,8 @@ def generate_text(prompt: str) -> str:
     )
 
     try:
-        response = requests.post(endpoint, json=payload, timeout=120)
-
-        if response.status_code == 404:
-            logger.error(
-                "Local LLM endpoint not found. endpoint=%s model=%s status_code=%s",
-                endpoint,
-                OLLAMA_MODEL,
-                response.status_code,
-            )
-            raise LLMClientError(
-                f"Ollama endpoint not found: {endpoint}. "
-                "Verify that Ollama is running and that OLLAMA_BASE_URL points to the correct server."
-            )
-
-        response.raise_for_status()
-
-    except requests.exceptions.RequestException as error:
+        data = post_json(endpoint, payload, requester=requests.post)
+    except OllamaTransportError as error:
         logger.error(
             "Error communicating with local LLM. endpoint=%s model=%s error=%s",
             endpoint,
@@ -95,8 +81,6 @@ def generate_text(prompt: str) -> str:
             error,
         )
         raise LLMClientError(f"Error communicating with local LLM: {error}") from error
-
-    data = response.json()
 
     logger.info(
         "Local LLM response metadata. model=%s response_length=%s "

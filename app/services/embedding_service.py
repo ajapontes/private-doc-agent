@@ -21,6 +21,7 @@ from typing import Literal
 import requests
 
 from app.config import OLLAMA_BASE_URL, OLLAMA_EMBEDDING_MODEL
+from app.services.ollama_transport import OllamaTransportError, post_json
 
 
 logger = logging.getLogger(__name__)
@@ -96,10 +97,8 @@ def generate_embeddings(
     )
 
     try:
-        response = requests.post(endpoint, json=payload, timeout=120)
-        response.raise_for_status()
-        data = response.json()
-    except (requests.exceptions.RequestException, ValueError) as error:
+        data = post_json(endpoint, payload, requester=requests.post)
+    except OllamaTransportError as error:
         logger.error(
             "Error communicating with local embedding model. model=%s endpoint=%s error=%s",
             OLLAMA_EMBEDDING_MODEL,

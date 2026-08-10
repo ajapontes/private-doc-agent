@@ -12,7 +12,10 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.indexing_service import IndexingServiceError
+from app.services.indexing_service import (
+    IndexingInfrastructureError,
+    IndexingServiceError,
+)
 
 
 class IndexingApiTests(unittest.TestCase):
@@ -103,6 +106,19 @@ class IndexingApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["detail"], "No supported documents")
+
+    @patch("app.main.index_document")
+    def test_infrastructure_failure_returns_503(self, mock_index_document):
+        """Temporary Ollama or ChromaDB failures advertise unavailability."""
+        mock_index_document.side_effect = IndexingInfrastructureError(
+            "Ollama unavailable"
+        )
+
+        with TestClient(app) as client:
+            response = client.post("/documents/demo.md/index")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "Ollama unavailable")
 
 
 if __name__ == "__main__":

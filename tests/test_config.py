@@ -39,6 +39,8 @@ class ConfigurationTests(unittest.TestCase):
             config = load_config()
 
         self.assertEqual(config.APP_VERSION, "0.7.0")
+        self.assertEqual(config.OLLAMA_REQUEST_TIMEOUT_SECONDS, 120)
+        self.assertEqual(config.OLLAMA_MAX_RETRIES, 2)
         self.assertEqual(config.VECTOR_DISTANCE_METRIC, "cosine")
         self.assertEqual(config.VECTOR_SEARCH_TOP_K, 5)
         self.assertIsNone(config.VECTOR_MIN_RELEVANCE_SCORE)

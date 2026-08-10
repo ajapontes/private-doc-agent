@@ -17,6 +17,7 @@ from app.services.vector_store import (
     close_vector_store,
     count_stored_chunks,
     delete_document_chunks,
+    delete_stale_document_chunks,
     query_chunks,
     reset_vector_store,
     upsert_chunks,
@@ -102,6 +103,16 @@ class VectorStoreTests(unittest.TestCase):
         delete_document_chunks("demo.txt")
 
         self.assertEqual(count_stored_chunks(), 0)
+
+    def test_reindexing_deletes_only_stale_document_chunks(self):
+        """Chunks absent from the replacement are removed after its upsert."""
+        chunks = self._chunks()
+        upsert_chunks(chunks, [[1.0, 0.0], [0.0, 1.0]])
+
+        deleted = delete_stale_document_chunks("demo.txt", {0})
+
+        self.assertEqual(deleted, 1)
+        self.assertEqual(count_stored_chunks(), 1)
 
     def test_vector_store_can_be_reset_with_explicit_confirmation(self):
         """A confirmed reset removes all records and recreates the collection."""

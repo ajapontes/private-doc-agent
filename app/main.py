@@ -38,10 +38,12 @@ from app.services.agent_service import (
 )
 from app.services.document_loader import list_documents, read_document
 from app.services.indexing_service import (
+    IndexingInfrastructureError,
     IndexingServiceError,
     index_all_documents,
     index_document,
 )
+from app.services.health_service import check_dependencies
 from app.services.rag_service import RAGServiceError, answer_question
 from app.services.retrieval_service import (
     RetrievalServiceError,
@@ -179,10 +181,18 @@ def health_check():
     """
     logger.info("Health check requested.")
 
+    components = check_dependencies()
+    status = (
+        "ok"
+        if all(component["status"] == "ok" for component in components.values())
+        else "degraded"
+    )
+
     return {
-        "status": "ok",
+        "status": status,
         "app": APP_NAME,
         "version": APP_VERSION,
+        "components": components,
     }
 
 
@@ -212,6 +222,9 @@ def index_available_documents():
 
     try:
         result = index_all_documents()
+    except IndexingInfrastructureError as error:
+        logger.error("Bulk document indexing unavailable. error=%s", error)
+        raise HTTPException(status_code=503, detail=str(error))
     except IndexingServiceError as error:
         logger.error("Bulk document indexing failed. error=%s", error)
         raise HTTPException(status_code=500, detail=str(error))
@@ -240,6 +253,9 @@ def index_available_document(filename: str):
     except ValueError as error:
         logger.warning("Document indexing failed. filename=%s error=%s", filename, error)
         raise HTTPException(status_code=400, detail=str(error))
+    except IndexingInfrastructureError as error:
+        logger.error("Document indexing unavailable. filename=%s error=%s", filename, error)
+        raise HTTPException(status_code=503, detail=str(error))
     except IndexingServiceError as error:
         logger.error("Document indexing failed. filename=%s error=%s", filename, error)
         raise HTTPException(status_code=500, detail=str(error))

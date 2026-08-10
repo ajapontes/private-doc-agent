@@ -27,7 +27,7 @@ from app.services.document_loader import (
 from app.services.embedding_service import EmbeddingServiceError, embed_documents
 from app.services.vector_store import (
     VectorStoreError,
-    delete_document_chunks,
+    delete_stale_document_chunks,
     upsert_chunks,
 )
 
@@ -43,6 +43,12 @@ class IndexingServiceError(Exception):
 
 class InvalidDocumentError(IndexingServiceError):
     """Raised when a document itself has no content that can be indexed."""
+
+    pass
+
+
+class IndexingInfrastructureError(IndexingServiceError):
+    """Raised when Ollama or ChromaDB prevents an indexing operation."""
 
     pass
 
@@ -113,8 +119,11 @@ def index_document(filename: str) -> dict:
 
         embeddings = _embed_chunks_in_batches(chunks)
 
-        delete_document_chunks(filename)
         chunks_indexed = upsert_chunks(chunks, embeddings)
+        stale_chunks_deleted = delete_stale_document_chunks(
+            filename,
+            {chunk["chunk_id"] for chunk in chunks},
+        )
 
     except (FileNotFoundError, ValueError):
         raise
@@ -126,7 +135,7 @@ def index_document(filename: str) -> dict:
             filename,
             error,
         )
-        raise IndexingServiceError(
+        raise IndexingInfrastructureError(
             f"Unable to index document '{filename}': {error}"
         ) from error
 
@@ -135,6 +144,7 @@ def index_document(filename: str) -> dict:
         "chunks_indexed": chunks_indexed,
         "vector_dimension": len(embeddings[0]),
         "embedding_model": OLLAMA_EMBEDDING_MODEL,
+        "stale_chunks_deleted": stale_chunks_deleted,
     }
 
     logger.info(

@@ -96,6 +96,10 @@ OLLAMA_EMBEDDING_MODEL = _get_required_text(
     "OLLAMA_EMBEDDING_MODEL", "nomic-embed-text-v2-moe:latest"
 )
 EMBEDDING_BATCH_SIZE = _get_positive_int("EMBEDDING_BATCH_SIZE", 32)
+OLLAMA_REQUEST_TIMEOUT_SECONDS = _get_positive_int(
+    "OLLAMA_REQUEST_TIMEOUT_SECONDS", 120
+)
+OLLAMA_MAX_RETRIES = _get_non_negative_int("OLLAMA_MAX_RETRIES", 2)
 
 
 # Document chunking configuration for the RAG pipeline

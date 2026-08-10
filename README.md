@@ -4,7 +4,7 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 
 ## Current version
 
-`v0.7.0`
+`v0.8.0`
 
 Documentation is also available in [Spanish](README_ES.md).
 
@@ -19,6 +19,10 @@ Documentation is also available in [Spanish](README_ES.md).
 - Persistent local vector storage with ChromaDB.
 - Indexing of one document or all supported documents.
 - Resilient bulk indexing that quarantines invalid documents in `data/invalid/` and continues processing valid files.
+- Detection and quarantine of unsupported formats during bulk indexing.
+- Safe reindexing that replaces changed chunks and removes only obsolete records.
+- Configurable retries for transient Ollama failures and component-level health diagnostics.
+- Exact preservation of physical filenames without automatic correction or renaming.
 - Semantic retrieval of relevant document chunks.
 - Retrieval-augmented generation (RAG) with traceable sources.
 - Grounded answers based on retrieved document evidence.
@@ -81,7 +85,9 @@ Place local documents in:
 data/input/
 ```
 
-New files in this directory are ignored by Git to prevent private documents from being added accidentally. The versioned `demo.txt`, `demo.md`, and `demo.pdf` files remain available for development and testing.
+New files in this directory are ignored by Git to prevent private documents from being added accidentally. The versioned `demo.txt` and `demo.md` files remain available for development and testing.
+
+Filenames are preserved exactly as they exist on disk, including Unicode characters or names that appear misspelled or damaged. The application does not guess corrections or rename source documents.
 
 ## Requirements
 
@@ -140,6 +146,8 @@ The following values can be configured in `.env`:
 | `VECTOR_DISTANCE_METRIC` | `cosine` | ChromaDB distance metric: `cosine`, `l2`, or `ip`. |
 | `VECTOR_SEARCH_TOP_K` | `5` | Default maximum number of chunks returned by `/retrieve` and supplied to `/ask`. |
 | `VECTOR_MIN_RELEVANCE_SCORE` | empty | Optional normalized relevance threshold from `0` to `1`. |
+| `OLLAMA_REQUEST_TIMEOUT_SECONDS` | `120` | Maximum duration of each Ollama request. |
+| `OLLAMA_MAX_RETRIES` | `2` | Retries for transient Ollama connection and server failures. |
 | `DETAILED_TRACE_ENABLED` | `false` | Include a content-safe structured execution trace in successful `/agent` responses. |
 
 Changing `VECTOR_DISTANCE_METRIC` requires recreating the collection and reindexing the documents. Use the confirmed administrative reset endpoint described below; the application never removes the complete ChromaDB directory.
@@ -198,7 +206,11 @@ Example response:
 {
   "status": "ok",
   "app": "private-doc-agent",
-  "version": "0.6.0"
+  "version": "0.8.0",
+  "components": {
+    "ollama": {"status": "ok"},
+    "vector_store": {"status": "ok", "stored_chunks": 208}
+  }
 }
 ```
 
@@ -377,7 +389,7 @@ Run the complete automated suite:
 python -m unittest discover -s tests -v
 ```
 
-The `v0.7.0` implementation contains 146 automated tests, including resilient-ingestion, quarantine, and detailed-trace coverage.
+The `v0.8.0` implementation contains 160 automated tests, including resilient ingestion, safe reindexing, dependency health, retry behavior, infrastructure-error classification, and exact filename preservation.
 
 The suite covers:
 
@@ -475,6 +487,15 @@ The suite covers:
 - Optional structured trace for local-agent request, planning, decision, execution, and result stages.
 - English and Spanish repository documentation maintained together.
 - Privacy-aware logs and automated coverage for the new workflows.
+
+### v0.8.0 - Stability and safe reindexing
+
+- Unsupported formats are detected and quarantined during bulk indexing.
+- Transient Ollama failures use configurable retries.
+- Reindexing preserves the previous index until new chunks are persisted, then removes only obsolete records.
+- Infrastructure failures return `503` and remain distinct from invalid documents.
+- `/health` reports Ollama and vector-store status.
+- Physical filenames are preserved exactly without automatic correction.
 
 ## Current limitations
 

@@ -4,7 +4,7 @@ Private Doc Agent es una API *local-first* para leer, buscar, indexar y consulta
 
 ## Versión actual
 
-`v0.7.0`
+`v0.8.0`
 
 La documentación en inglés está disponible en [README.md](README.md).
 
@@ -17,6 +17,10 @@ La documentación en inglés está disponible en [README.md](README.md).
 - Métrica vectorial configurable: `cosine`, `l2` o `ip`.
 - Reinicio seguro de la colección vectorial con confirmación explícita.
 - Indexación masiva resiliente: los documentos inválidos se mueven a `data/invalid/` y los válidos continúan procesándose.
+- Detección y cuarentena de formatos no soportados durante la indexación masiva.
+- Reindexación segura que reemplaza chunks modificados y elimina únicamente los obsoletos.
+- Reintentos configurables para fallos transitorios de Ollama y diagnóstico de dependencias en `/health`.
+- Preservación exacta del nombre físico de cada archivo, sin correcciones ni renombrados automáticos.
 - Trace estructurado y configurable para depuración, sin exponer solicitudes ni contenido privado.
 - Logs operativos y de interacción con el LLM separados.
 - Pruebas automatizadas para servicios, API, RAG, agente, configuración, ChromaDB, cuarentena y trace.
@@ -65,6 +69,8 @@ ollama list
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | URL del servicio local de Ollama. |
 | `OLLAMA_MODEL` | `qwen3.5:4b` | Modelo local de generación. |
 | `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text-v2-moe:latest` | Modelo local de embeddings. |
+| `OLLAMA_REQUEST_TIMEOUT_SECONDS` | `120` | Duración máxima de cada solicitud a Ollama. |
+| `OLLAMA_MAX_RETRIES` | `2` | Reintentos ante fallos transitorios de conexión o servidor. |
 | `EMBEDDING_BATCH_SIZE` | `32` | Tamaño máximo de cada lote de embeddings. |
 | `CHUNK_SIZE` | `1000` | Longitud de cada fragmento. |
 | `CHUNK_OVERLAP` | `200` | Solapamiento entre fragmentos. |
@@ -111,6 +117,8 @@ data/invalid/
 
 El proceso continúa con los demás documentos. Si ya existe un archivo con el mismo nombre, se agrega un sufijo numérico y no se sobrescribe el anterior. Los fallos de infraestructura, como Ollama o ChromaDB no disponibles, siguen deteniendo la operación para evitar clasificar un documento válido como inválido.
 
+Los formatos no soportados, como `.xlsx`, también se detectan y trasladan a cuarentena. Los nombres se conservan exactamente como existen en disco, incluso si contienen Unicode, errores ortográficos o texto aparentemente dañado; la aplicación no intenta adivinar ni aplicar correcciones.
+
 ## Trace detallado
 
 Para habilitarlo en `.env`:
@@ -140,7 +148,7 @@ El endpoint elimina únicamente la colección configurada y la recrea con la mé
 python -m unittest discover -s tests -v
 ```
 
-La suite cubre carga de documentos, PDF/DOCX, fragmentación, embeddings, ChromaDB, métricas, reinicio, indexación resiliente, cuarentena, recuperación, RAG, agente, API, configuración, privacidad del trace y logging.
+La versión `v0.8.0` contiene 160 pruebas. La suite cubre carga de documentos, PDF/DOCX, nombres Unicode, fragmentación, embeddings, reintentos de Ollama, ChromaDB, métricas, reinicio, reindexación segura, errores de infraestructura, health check, cuarentena, recuperación, RAG, agente, API, configuración, privacidad del trace y logging.
 
 ## Privacidad
 
@@ -161,6 +169,7 @@ La suite cubre carga de documentos, PDF/DOCX, fragmentación, embeddings, Chroma
 | `v0.5.0` | Agente local con herramientas permitidas. |
 | `v0.6.0` | Métrica configurable y reinicio seguro. |
 | `v0.7.0` | Ingesta resiliente, cuarentena, trace detallado y documentación bilingüe. |
+| `v0.8.0` | Estabilidad, formatos no soportados, reintentos, reindexación segura y health ampliado. |
 
 ## Repositorio
 

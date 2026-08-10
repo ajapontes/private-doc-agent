@@ -76,6 +76,24 @@ class DocumentLoaderTests(unittest.TestCase):
 
         self.assertEqual(content, "Documento privado con acentos: información.")
 
+    def test_unicode_filename_is_preserved_during_discovery(self):
+        """Discovery returns the exact physical name without normalization."""
+        filename = "2025 innovación técnica — versión ñ.txt"
+        (self.input_directory / filename).write_text("Contenido", encoding="utf-8")
+
+        documents = document_loader.list_documents()
+
+        self.assertEqual(documents[0]["filename"], filename)
+
+    def test_apparently_damaged_filename_is_read_without_renaming(self):
+        """Suspicious-looking names remain valid opaque document identifiers."""
+        filename = "innovacinnn tecnolnngica.md"
+        (self.input_directory / filename).write_text("Contenido", encoding="utf-8")
+
+        content = document_loader.read_document(filename)
+
+        self.assertEqual(content, "Contenido")
+
     def test_markdown_document_is_read_as_utf8(self):
         """Markdown documents use the same UTF-8 reader as plain text."""
         file_path = self.input_directory / "guide.md"

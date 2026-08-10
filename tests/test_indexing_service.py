@@ -60,6 +60,29 @@ class IndexingServiceTests(unittest.TestCase):
         self.assertEqual(result["chunks_indexed"], 2)
         self.assertEqual(result["vector_dimension"], 2)
 
+    @patch("app.services.indexing_service.delete_stale_document_chunks")
+    @patch("app.services.indexing_service.upsert_chunks", return_value=1)
+    @patch("app.services.indexing_service.embed_documents", return_value=[[1.0]])
+    @patch("app.services.indexing_service.chunk_document")
+    def test_indexing_preserves_apparently_damaged_filename(
+        self,
+        mock_chunk_document,
+        _mock_embed_documents,
+        _mock_upsert_chunks,
+        mock_delete_stale_chunks,
+    ):
+        """Indexing never guesses a correction for a physical filename."""
+        filename = "innovacinnn tecnolnngica.md"
+        chunk = _chunk(0, "content")
+        chunk["filename"] = filename
+        mock_chunk_document.return_value = [chunk]
+
+        result = index_document(filename)
+
+        mock_chunk_document.assert_called_once_with(filename)
+        mock_delete_stale_chunks.assert_called_once_with(filename, {0})
+        self.assertEqual(result["filename"], filename)
+
     @patch("app.services.indexing_service.upsert_chunks", return_value=3)
     @patch("app.services.indexing_service.delete_stale_document_chunks")
     @patch("app.services.indexing_service.embed_documents")

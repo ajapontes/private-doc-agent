@@ -2,6 +2,27 @@
 
 All notable changes to Private Doc Agent are documented in this file.
 
+## [0.8.0] - 2026-08-10
+
+### Added
+
+- Component-level `/health` diagnostics for Ollama and the local vector store.
+- Configurable retry handling for transient Ollama connection and server failures.
+- Regression coverage for unsupported formats, infrastructure failures, safe reindexing, and exact filename preservation.
+
+### Changed
+
+- Unsupported input formats, including `.xlsx`, are detected during bulk indexing and moved to `data/invalid/` without stopping valid documents.
+- Reindexing upserts the new chunks before deleting only obsolete chunks, preserving the previous index when generation or persistence fails.
+- Ollama and ChromaDB failures are classified as infrastructure errors and exposed as HTTP `503` responses.
+- Physical filenames are preserved exactly; the application does not guess corrections or rename names that appear damaged.
+- Application version updated to `0.8.0`.
+
+### Fixed
+
+- Agent plans without an `arguments` property are handled safely.
+- Unsupported files are no longer silently ignored by bulk indexing.
+
 ## [0.7.0] - 2026-08-08
 
 ### Added

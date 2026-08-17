@@ -4,6 +4,27 @@ Todos los cambios relevantes de Private Doc Agent se documentan en este archivo.
 
 La versión en inglés está disponible en [CHANGELOG.md](CHANGELOG.md).
 
+## [0.10.0] - 2026-08-17
+
+### Agregado
+
+- Autenticación opcional mediante `X-API-Key`, configurada con `API_KEY`.
+- Protección opcional de todos los endpoints operativos mediante `API_KEY_PROTECT_ALL`.
+- Pruebas unitarias y de integración HTTP para el comportamiento de autenticación.
+
+### Cambiado
+
+- Los endpoints administrativos exigen la API key configurada, conservando el modo local abierto cuando no existe una clave.
+- Versión de la aplicación actualizada a `0.10.0`.
+- Documentación de seguridad sincronizada en inglés y español.
+
+### Seguridad
+
+- Las API keys se comparan en tiempo constante.
+- La ausencia de credenciales responde HTTP `401` y las credenciales inválidas responden HTTP `403`.
+- Los logs de rechazo no incluyen claves configuradas ni recibidas.
+- Los endpoints de salud y documentación permanecen públicos cuando se habilita la protección completa.
+
 ## [0.9.0] - 2026-08-16
 
 ### Agregado

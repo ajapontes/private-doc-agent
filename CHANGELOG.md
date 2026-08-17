@@ -4,6 +4,27 @@ All notable changes to Private Doc Agent are documented in this file.
 
 The Spanish version is available in [CHANGELOG_ES.md](CHANGELOG_ES.md).
 
+## [0.10.0] - 2026-08-17
+
+### Added
+
+- Optional `X-API-Key` authentication configured through `API_KEY`.
+- Optional full operational endpoint protection through `API_KEY_PROTECT_ALL`.
+- Automated unit and HTTP integration coverage for authentication behavior.
+
+### Changed
+
+- Administrative endpoints require the configured API key while preserving open local mode when no key is configured.
+- Application version updated to `0.10.0`.
+- English and Spanish security documentation synchronized.
+
+### Security
+
+- API keys are compared in constant time.
+- Missing credentials return HTTP `401`; invalid credentials return HTTP `403`.
+- Authentication rejection logs exclude configured and supplied secrets.
+- Health and API documentation endpoints remain public when full protection is enabled.
+
 ## [0.9.0] - 2026-08-16
 
 ### Added

@@ -4,7 +4,7 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 
 ## Current version
 
-`v0.9.0`
+`v0.10.0`
 
 Documentation is also available in [Spanish](README_ES.md).
 The changelog is available in [English](CHANGELOG.md) and [Spanish](CHANGELOG_ES.md).
@@ -31,6 +31,8 @@ The changelog is available in [English](CHANGELOG.md) and [Spanish](CHANGELOG_ES
 - Configurable vector distance metric (`cosine`, `l2`, or `ip`).
 - Configurable retrieval result count and optional minimum relevance score.
 - Safe vector collection reset with explicit confirmation.
+- Optional API key authentication for administrative and operational endpoints.
+- Constant-time API key comparison with privacy-safe authentication logging.
 - Controlled behavior when the available documents do not provide sufficient context.
 - Centralized console and rotating-file logging.
 - Separate local logging of complete LLM prompts and responses for debugging.
@@ -150,6 +152,8 @@ The following values can be configured in `.env`:
 | `OLLAMA_REQUEST_TIMEOUT_SECONDS` | `120` | Maximum duration of each Ollama request. |
 | `OLLAMA_MAX_RETRIES` | `2` | Retries for transient Ollama connection and server failures. |
 | `DETAILED_TRACE_ENABLED` | `false` | Include a content-safe structured execution trace in successful `/agent` responses. |
+| `API_KEY` | empty | Optional secret expected in the `X-API-Key` header; empty preserves local open mode. |
+| `API_KEY_PROTECT_ALL` | `false` | Protect operational endpoints in addition to administrative endpoints when `API_KEY` is configured. |
 
 Changing `VECTOR_DISTANCE_METRIC` requires recreating the collection and reindexing the documents. Use the confirmed administrative reset endpoint described below; the application never removes the complete ChromaDB directory.
 
@@ -325,6 +329,7 @@ Set `DETAILED_TRACE_ENABLED=true` to include a `trace` array in successful respo
 ```http
 POST /admin/vector-store/reset
 Content-Type: application/json
+X-API-Key: your-local-secret
 
 {
   "confirm": true
@@ -332,6 +337,12 @@ Content-Type: application/json
 ```
 
 The endpoint counts the stored chunks, deletes only the configured collection, and recreates it with the current distance metric. A missing or false confirmation is rejected with HTTP `400`. After a successful reset, index the documents again before using semantic retrieval or RAG.
+
+### API key authentication
+
+Set `API_KEY` in `.env` to require the `X-API-Key` header on administrative endpoints. A missing header returns HTTP `401` and an invalid value returns HTTP `403`. Leave the variable empty to preserve the local open behavior used by previous releases.
+
+Set `API_KEY_PROTECT_ALL=true` to protect operational endpoints as well. `/health`, `/docs`, `/redoc`, and `/openapi.json` remain public so health monitoring and API documentation continue to work. API key values are compared in constant time and are never written to application logs.
 
 ## Local data and persistence
 
@@ -390,7 +401,7 @@ Run the complete automated suite:
 python -m unittest discover -s tests -v
 ```
 
-The `v0.9.0` implementation contains 160 automated tests, including resilient ingestion, safe reindexing, dependency health, retry behavior, infrastructure-error classification, and exact filename preservation.
+The `v0.10.0` implementation contains 175 automated tests, including API key authentication, resilient ingestion, safe reindexing, dependency health, retry behavior, infrastructure-error classification, and exact filename preservation.
 
 The suite covers:
 
@@ -503,6 +514,14 @@ The suite covers:
 - Complete Spanish changelog added in `CHANGELOG_ES.md`.
 - English and Spanish release documentation synchronized and cross-linked.
 
+### v0.10.0 - Security Version
+
+- Optional `X-API-Key` authentication with backward-compatible open mode.
+- Administrative endpoint protection when an API key is configured.
+- Optional protection for all operational endpoints.
+- Constant-time secret comparison and privacy-safe rejection logs.
+- Automated security and HTTP authentication coverage.
+
 ## Current limitations
 
 - Only `.txt`, `.md`, `.pdf`, and `.docx` documents are supported.
@@ -512,7 +531,7 @@ The suite covers:
 - Reranking is not implemented; ranking relies on the configured ChromaDB distance metric.
 - RAG source references identify files and chunks but do not expose PDF page numbers.
 - ChromaDB is intended for local, single-application use in this version.
-- The administrative reset endpoint does not yet have authentication or authorization and must not be exposed to untrusted networks.
+- API key authentication provides shared-secret access control but does not implement users, roles, or granular authorization.
 - There is no frontend, multi-step agent orchestration, or MCP server.
 
 ## Privacy considerations

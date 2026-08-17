@@ -4,7 +4,7 @@ Private Doc Agent es una API *local-first* para leer, buscar, indexar y consulta
 
 ## Versión actual
 
-`v0.9.0`
+`v0.10.0`
 
 La documentación en inglés está disponible en [README.md](README.md).
 El registro de cambios está disponible en [español](CHANGELOG_ES.md) y en [inglés](CHANGELOG.md).
@@ -17,6 +17,8 @@ El registro de cambios está disponible en [español](CHANGELOG_ES.md) y en [ing
 - Agente local de un solo paso con herramientas permitidas y argumentos validados.
 - Métrica vectorial configurable: `cosine`, `l2` o `ip`.
 - Reinicio seguro de la colección vectorial con confirmación explícita.
+- Autenticación opcional mediante API key para endpoints administrativos y operativos.
+- Comparación de claves en tiempo constante y logs de autenticación sin secretos.
 - Indexación masiva resiliente: los documentos inválidos se mueven a `data/invalid/` y los válidos continúan procesándose.
 - Detección y cuarentena de formatos no soportados durante la indexación masiva.
 - Reindexación segura que reemplaza chunks modificados y elimina únicamente los obsoletos.
@@ -81,6 +83,8 @@ ollama list
 | `VECTOR_MIN_RELEVANCE_SCORE` | vacío | Umbral opcional de relevancia entre `0` y `1`. |
 | `LOG_SENSITIVE_CONTENT` | `false` | Control reservado para contenido sensible en logs. |
 | `DETAILED_TRACE_ENABLED` | `false` | Incluye el trace seguro en respuestas exitosas de `/agent`. |
+| `API_KEY` | vacío | Secreto opcional esperado en el header `X-API-Key`; vacío conserva el modo local abierto. |
+| `API_KEY_PROTECT_ALL` | `false` | Protege endpoints operativos además de los administrativos cuando `API_KEY` está configurada. |
 
 ## Ejecución
 
@@ -135,6 +139,7 @@ Las respuestas exitosas de `/agent` incluyen las etapas de validación, planific
 ```http
 POST /admin/vector-store/reset
 Content-Type: application/json
+X-API-Key: secreto-local
 
 {
   "confirm": true
@@ -143,13 +148,19 @@ Content-Type: application/json
 
 El endpoint elimina únicamente la colección configurada y la recrea con la métrica actual. Después se deben indexar nuevamente los documentos.
 
+## Autenticación mediante API key
+
+Configura `API_KEY` en `.env` para exigir el header `X-API-Key` en los endpoints administrativos. Si el header no está presente, la API responde HTTP `401`; si la clave es incorrecta, responde HTTP `403`. Dejar la variable vacía conserva el modo local abierto de versiones anteriores.
+
+Configura `API_KEY_PROTECT_ALL=true` para proteger también los endpoints operativos. `/health`, `/docs`, `/redoc` y `/openapi.json` permanecen públicos para conservar el monitoreo y la documentación. Las claves se comparan en tiempo constante y nunca se escriben en los logs.
+
 ## Pruebas
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-La versión `v0.9.0` contiene 160 pruebas. La suite cubre carga de documentos, PDF/DOCX, nombres Unicode, fragmentación, embeddings, reintentos de Ollama, ChromaDB, métricas, reinicio, reindexación segura, errores de infraestructura, health check, cuarentena, recuperación, RAG, agente, API, configuración, privacidad del trace y logging.
+La versión `v0.10.0` contiene 175 pruebas. La suite cubre autenticación mediante API key, carga de documentos, PDF/DOCX, nombres Unicode, fragmentación, embeddings, reintentos de Ollama, ChromaDB, métricas, reinicio, reindexación segura, errores de infraestructura, health check, cuarentena, recuperación, RAG, agente, API, configuración, privacidad del trace y logging.
 
 ## Privacidad
 

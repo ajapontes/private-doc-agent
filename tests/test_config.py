@@ -38,7 +38,7 @@ class ConfigurationTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             config = load_config()
 
-        self.assertEqual(config.APP_VERSION, "0.9.0")
+        self.assertEqual(config.APP_VERSION, "0.10.0")
         self.assertEqual(config.OLLAMA_REQUEST_TIMEOUT_SECONDS, 120)
         self.assertEqual(config.OLLAMA_MAX_RETRIES, 2)
         self.assertEqual(config.VECTOR_DISTANCE_METRIC, "cosine")
@@ -46,6 +46,21 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIsNone(config.VECTOR_MIN_RELEVANCE_SCORE)
         self.assertFalse(config.LOG_SENSITIVE_CONTENT)
         self.assertFalse(config.DETAILED_TRACE_ENABLED)
+        self.assertIsNone(config.API_KEY)
+        self.assertFalse(config.API_KEY_PROTECT_ALL)
+
+    def test_api_key_is_trimmed_and_loaded(self):
+        """A configured API key is loaded without surrounding whitespace."""
+        with patch.dict(os.environ, {"API_KEY": "  local-secret  "}, clear=True):
+            config = load_config()
+
+        self.assertEqual(config.API_KEY, "local-secret")
+
+    def test_api_key_protect_all_requires_boolean_value(self):
+        """Full API protection accepts only explicit boolean configuration."""
+        with patch.dict(os.environ, {"API_KEY_PROTECT_ALL": "yes"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "true or false"):
+                load_config()
 
     def test_detailed_trace_requires_boolean_value(self):
         """Detailed tracing accepts only an explicit true or false value."""

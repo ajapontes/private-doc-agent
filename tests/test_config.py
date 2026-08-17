@@ -38,7 +38,7 @@ class ConfigurationTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             config = load_config()
 
-        self.assertEqual(config.APP_VERSION, "0.8.0")
+        self.assertEqual(config.APP_VERSION, "0.9.0")
         self.assertEqual(config.OLLAMA_REQUEST_TIMEOUT_SECONDS, 120)
         self.assertEqual(config.OLLAMA_MAX_RETRIES, 2)
         self.assertEqual(config.VECTOR_DISTANCE_METRIC, "cosine")

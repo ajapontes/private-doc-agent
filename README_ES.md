@@ -4,9 +4,10 @@ Private Doc Agent es una API *local-first* para leer, buscar, indexar y consulta
 
 ## Versión actual
 
-`v0.8.0`
+`v0.9.0`
 
 La documentación en inglés está disponible en [README.md](README.md).
+El registro de cambios está disponible en [español](CHANGELOG_ES.md) y en [inglés](CHANGELOG.md).
 
 ## Funcionalidades implementadas
 
@@ -148,7 +149,7 @@ El endpoint elimina únicamente la colección configurada y la recrea con la mé
 python -m unittest discover -s tests -v
 ```
 
-La versión `v0.8.0` contiene 160 pruebas. La suite cubre carga de documentos, PDF/DOCX, nombres Unicode, fragmentación, embeddings, reintentos de Ollama, ChromaDB, métricas, reinicio, reindexación segura, errores de infraestructura, health check, cuarentena, recuperación, RAG, agente, API, configuración, privacidad del trace y logging.
+La versión `v0.9.0` contiene 160 pruebas. La suite cubre carga de documentos, PDF/DOCX, nombres Unicode, fragmentación, embeddings, reintentos de Ollama, ChromaDB, métricas, reinicio, reindexación segura, errores de infraestructura, health check, cuarentena, recuperación, RAG, agente, API, configuración, privacidad del trace y logging.
 
 ## Privacidad
 
@@ -170,6 +171,7 @@ La versión `v0.8.0` contiene 160 pruebas. La suite cubre carga de documentos, P
 | `v0.6.0` | Métrica configurable y reinicio seguro. |
 | `v0.7.0` | Ingesta resiliente, cuarentena, trace detallado y documentación bilingüe. |
 | `v0.8.0` | Estabilidad, formatos no soportados, reintentos, reindexación segura y health ampliado. |
+| `v0.9.0` | Changelog completo en español y documentación bilingüe sincronizada. |
 
 ## Repositorio
 

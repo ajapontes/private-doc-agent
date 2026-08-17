@@ -4,9 +4,10 @@ Private Doc Agent is a local-first API for reading, searching, indexing, and que
 
 ## Current version
 
-`v0.8.0`
+`v0.9.0`
 
 Documentation is also available in [Spanish](README_ES.md).
+The changelog is available in [English](CHANGELOG.md) and [Spanish](CHANGELOG_ES.md).
 
 ## Implemented capabilities
 
@@ -389,7 +390,7 @@ Run the complete automated suite:
 python -m unittest discover -s tests -v
 ```
 
-The `v0.8.0` implementation contains 160 automated tests, including resilient ingestion, safe reindexing, dependency health, retry behavior, infrastructure-error classification, and exact filename preservation.
+The `v0.9.0` implementation contains 160 automated tests, including resilient ingestion, safe reindexing, dependency health, retry behavior, infrastructure-error classification, and exact filename preservation.
 
 The suite covers:
 
@@ -496,6 +497,11 @@ The suite covers:
 - Infrastructure failures return `503` and remain distinct from invalid documents.
 - `/health` reports Ollama and vector-store status.
 - Physical filenames are preserved exactly without automatic correction.
+
+### v0.9.0 - Bilingual changelog
+
+- Complete Spanish changelog added in `CHANGELOG_ES.md`.
+- English and Spanish release documentation synchronized and cross-linked.
 
 ## Current limitations
 

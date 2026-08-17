@@ -2,6 +2,20 @@
 
 All notable changes to Private Doc Agent are documented in this file.
 
+The Spanish version is available in [CHANGELOG_ES.md](CHANGELOG_ES.md).
+
+## [0.9.0] - 2026-08-16
+
+### Added
+
+- Spanish changelog in `CHANGELOG_ES.md`, covering the complete project history.
+- Cross-language links between the English and Spanish changelogs.
+
+### Changed
+
+- English and Spanish repository documentation synchronized for release `0.9.0`.
+- Application version updated to `0.9.0`.
+
 ## [0.8.0] - 2026-08-10
 
 ### Added

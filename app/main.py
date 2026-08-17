@@ -19,18 +19,22 @@ Current capabilities:
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.config import (
     APP_NAME,
     APP_VERSION,
+    API_KEY,
+    API_KEY_PROTECT_ALL,
     CHROMA_COLLECTION_NAME,
     OLLAMA_MODEL,
     VECTOR_DISTANCE_METRIC,
     VECTOR_SEARCH_TOP_K,
 )
 from app.logging_config import setup_logging, log_execution_separator
+from app.security import ApiKeyStatus, requires_api_key, validate_api_key
 from app.services.agent_service import (
     AgentExecutionError,
     AgentPlanningError,
@@ -81,6 +85,28 @@ app = FastAPI(
     version=APP_VERSION,
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def enforce_api_key(request: Request, call_next):
+    """Enforces optional API key authentication on protected API paths."""
+    path = request.url.path
+    if API_KEY is not None and requires_api_key(path, API_KEY_PROTECT_ALL):
+        status = validate_api_key(API_KEY, request.headers.get("X-API-Key"))
+        if status is ApiKeyStatus.MISSING:
+            logger.warning("API request rejected: missing API key. path=%s", path)
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "API key is required."},
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+        if status is ApiKeyStatus.INVALID:
+            logger.warning("API request rejected: invalid API key. path=%s", path)
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Invalid API key."},
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -228,6 +254,7 @@ def index_available_documents():
     except IndexingServiceError as error:
         logger.error("Bulk document indexing failed. error=%s", error)
         raise HTTPException(status_code=500, detail=str(error))
+
 
     logger.info(
         "Bulk document indexing completed. documents_indexed=%s "

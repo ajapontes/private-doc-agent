@@ -72,7 +72,9 @@ def _get_required_text(variable_name: str, default: str) -> str:
 
 # Application metadata
 APP_NAME = "private-doc-agent"
-APP_VERSION = "0.9.0"
+APP_VERSION = "0.10.0"
+API_KEY = os.getenv("API_KEY", "").strip() or None
+API_KEY_PROTECT_ALL = _get_bool("API_KEY_PROTECT_ALL", False)
 
 
 # Base project paths
